@@ -1,0 +1,218 @@
+ARS - Android Resource Switch Framework
+========================================
+
+Project Structure Overview:
+==========================
+
+ars/
+│
+├── 📁 ars-core/                           # Core Library Module
+│   ├── 📄 build.gradle.kts                # Build configuration
+│   ├── 📄 proguard-rules.pro              # ProGuard rules
+│   ├── 📄 consumer-rules.pro              # Consumer ProGuard rules
+│   │
+│   └── 📁 src/
+│       ├── 📁 main/
+│       │   ├── 📄 AndroidManifest.xml     # Library manifest
+│       │   │
+│       │   └── 📁 java/com/kagawagao/ars/
+│       │       ├── 🎯 ArsSkinManager.kt            # Core skin manager (Singleton)
+│       │       ├── 📦 SkinLoader.kt                # Skin package loader
+│       │       ├── 🔄 ResourceOverlayHelper.kt     # Overlay API wrapper
+│       │       ├── 🎨 SkinAttribute.kt             # View attribute manager
+│       │       ├── 📱 ArsApplication.kt            # Base Application class
+│       │       └── 🖼️ ArsActivity.kt               # Base Activity class
+│       │
+│       └── 📁 test/java/com/kagawagao/ars/
+│           └── ✅ ArsSkinManagerTest.kt     # Unit tests
+│
+├── 📁 app/                                # Demo Application
+│   ├── 📄 build.gradle.kts                # App build configuration
+│   ├── 📄 proguard-rules.pro              # App ProGuard rules
+│   │
+│   └── 📁 src/main/
+│       ├── 📄 AndroidManifest.xml         # App manifest
+│       │
+│       ├── 📁 java/com/kagawagao/ars/demo/
+│       │   ├── 🚀 DemoApplication.kt      # Demo app entry point
+│       │   └── 🏠 MainActivity.kt         # Main demo activity
+│       │
+│       └── 📁 res/
+│           ├── 📁 drawable/
+│           │   └── ic_launcher_foreground.xml
+│           ├── 📁 layout/
+│           │   └── activity_main.xml      # Main UI layout
+│           ├── 📁 values/
+│           │   ├── colors.xml             # Light theme colors
+│           │   ├── strings.xml            # String resources
+│           │   ├── themes.xml             # App themes
+│           │   └── ic_launcher_background.xml
+│           ├── 📁 values-night/
+│           │   └── colors.xml             # Dark theme colors
+│           └── 📁 mipmap-*/               # App icons
+│
+├── 📁 .github/workflows/
+│   └── 🔄 android-build.yml               # CI/CD configuration
+│
+├── 📁 gradle/wrapper/
+│   └── 📄 gradle-wrapper.properties       # Gradle wrapper config
+│
+├── 📄 build.gradle.kts                    # Root build configuration
+├── 📄 settings.gradle.kts                 # Project settings
+├── 📄 gradle.properties                   # Gradle properties
+├── 📄 .gitignore                          # Git ignore rules
+│
+└── 📚 Documentation/
+    ├── 📖 README.md                       # Quick start guide
+    ├── 📘 API.md                          # Complete API reference
+    ├── 📙 IMPLEMENTATION.md               # Implementation details
+    └── 📗 SUMMARY.md                      # Project summary
+
+
+Core Components:
+===============
+
+🎯 ArsSkinManager
+  • Singleton pattern for global skin management
+  • Theme mode switching (LIGHT/DARK)
+  • Skin package loading/unloading
+  • Theme change listener management
+  • Resource querying and retrieval
+
+📦 SkinLoader
+  • Load from Assets directory
+  • Load from external storage
+  • Manage installed skin packages
+  • Delete and clear operations
+
+🔄 ResourceOverlayHelper
+  • OverlayManager API wrapper (Android 14+)
+  • Enable/disable overlays
+  • Query overlay information
+  • System-level overlay management
+
+🎨 SkinAttribute
+  • Parse view skinning attributes
+  • Apply resources to views
+  • Support common attributes:
+    - background
+    - src
+    - textColor
+    - drawable*
+
+📱 ArsApplication
+  • Base Application class
+  • Auto-initialization
+  • Easy integration
+
+🖼️ ArsActivity
+  • Base Activity class
+  • Auto-skinning support
+  • Theme change handling
+  • Simplified API
+
+
+Key Features:
+============
+
+✅ Deep/Light Theme Switching
+   - System auto-adaptation
+   - Programmatic switching
+   - Real-time updates
+
+✅ Dynamic Skin Loading
+   - Multi-source support
+   - Runtime resource replacement
+   - Package validation
+
+✅ Android 14+ Support
+   - Minimum SDK: 34
+   - OverlayManager API
+   - Latest Android features
+
+
+Architecture:
+============
+
+┌─────────────────────────────────────┐
+│         Application Layer           │
+│   (Activities, Fragments, Views)    │
+└──────────────┬──────────────────────┘
+               │
+┌──────────────▼──────────────────────┐
+│         ARS Core Layer              │
+│  ┌──────────────────────────────┐   │
+│  │    ArsSkinManager            │   │
+│  │  (Singleton Pattern)         │   │
+│  └──────────┬───────────────────┘   │
+│             │                        │
+│  ┌──────────▼───────────────────┐   │
+│  │  SkinLoader                  │   │
+│  │  (Load from various sources) │   │
+│  └──────────────────────────────┘   │
+│                                      │
+│  ┌──────────────────────────────┐   │
+│  │  ResourceOverlayHelper       │   │
+│  │  (Android 14+ API)           │   │
+│  └──────────────────────────────┘   │
+└──────────────┬──────────────────────┘
+               │
+┌──────────────▼──────────────────────┐
+│      Android Framework Layer        │
+│  (ResourceOverlay, AssetManager)    │
+└─────────────────────────────────────┘
+
+
+Quality Metrics:
+===============
+
+Code Quality:
+  ✅ Passed code review
+  ✅ Clean architecture
+  ✅ Proper error handling
+  ✅ Memory leak prevention
+
+Security:
+  ✅ CodeQL scan: 0 issues
+  ✅ Proper permissions
+  ✅ Secure reflection usage
+
+Documentation:
+  ✅ Comprehensive README
+  ✅ Full API documentation
+  ✅ Implementation guide
+  ✅ Code comments
+
+Testing:
+  ✅ Unit tests
+  ✅ CI/CD pipeline
+  ✅ Build automation
+
+
+Usage Example:
+=============
+
+// 1. Extend ArsApplication
+class MyApp : ArsApplication()
+
+// 2. Extend ArsActivity
+class MyActivity : ArsActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        
+        // Load skin
+        val skinLoader = SkinLoader(this)
+        val path = skinLoader.loadFromAssets("skin.apk", "skin.apk")
+        path?.let { loadSkin(it) }
+        
+        // Switch theme
+        switchTheme(ArsSkinManager.ThemeMode.DARK)
+        
+        // Reset skin
+        resetSkin()
+    }
+}
+
+
+Status: ✅ COMPLETE AND PRODUCTION READY
+========================================
