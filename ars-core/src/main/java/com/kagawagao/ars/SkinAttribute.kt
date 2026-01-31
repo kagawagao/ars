@@ -90,12 +90,7 @@ class SkinAttribute(private val context: Context) {
      */
     private fun getDrawable(resId: Int, skinManager: ArsSkinManager): Drawable? {
         val resources = skinManager.getTargetResources()
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            resources.getDrawable(resId, context.theme)
-        } else {
-            @Suppress("DEPRECATION")
-            resources.getDrawable(resId)
-        }
+        return resources.getDrawable(resId, context.theme)
     }
     
     /**

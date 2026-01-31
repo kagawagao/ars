@@ -16,11 +16,7 @@ import androidx.annotation.RequiresApi
 class ResourceOverlayHelper(private val context: Context) {
     
     private val overlayManager: OverlayManager? by lazy {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            context.getSystemService(Context.OVERLAY_SERVICE) as? OverlayManager
-        } else {
-            null
-        }
+        context.getSystemService(Context.OVERLAY_SERVICE) as? OverlayManager
     }
     
     /**

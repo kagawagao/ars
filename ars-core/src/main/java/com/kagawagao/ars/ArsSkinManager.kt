@@ -63,8 +63,11 @@ class ArsSkinManager private constructor(private val context: Context) {
             skinPackageName = packageInfo.packageName
             
             // 创建 AssetManager 实例
-            val assetManager = AssetManager::class.java.newInstance()
-            val addAssetPath = AssetManager::class.java.getMethod("addAssetPath", String::class.java)
+            // 注意：使用反射是因为 addAssetPath 是隐藏 API
+            // 在某些设备或未来版本可能受限，建议使用 PackageManager 或其他官方 API
+            val assetManager = AssetManager::class.java.getDeclaredConstructor().newInstance()
+            val addAssetPath = AssetManager::class.java.getDeclaredMethod("addAssetPath", String::class.java)
+            addAssetPath.isAccessible = true
             addAssetPath.invoke(assetManager, skinPath)
             
             // 创建皮肤包的 Resources 实例
@@ -125,12 +128,7 @@ class ArsSkinManager private constructor(private val context: Context) {
      */
     fun getColor(resId: Int): Int {
         val resources = getTargetResources()
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            resources.getColor(resId, context.theme)
-        } else {
-            @Suppress("DEPRECATION")
-            resources.getColor(resId)
-        }
+        return resources.getColor(resId, context.theme)
     }
     
     /**
