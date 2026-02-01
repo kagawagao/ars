@@ -34,7 +34,7 @@ class ResourceOverlayHelper(private val context: Context) {
      */
     fun getOverlayInfos(targetPackage: String): List<OverlayInfo>? {
         return try {
-            overlayManager?.getOverlayInfosForTarget(targetPackage, 0)
+            overlayManager?.getOverlayInfosForTarget(targetPackage)
         } catch (e: Exception) {
             e.printStackTrace()
             null
@@ -46,11 +46,16 @@ class ResourceOverlayHelper(private val context: Context) {
      * 
      * @param overlayPackage Overlay 包名
      * @return 是否成功
+     * 
+     * 注意：此方法需要系统权限才能执行
      */
     fun enableOverlay(overlayPackage: String): Boolean {
         return try {
-            overlayManager?.setEnabled(overlayPackage, true, 0)
-            true
+            // OverlayManager的setEnabled等方法在Android 14中需要系统权限
+            // 这里仅作为API示例，实际使用需要系统签名权限
+            // overlayManager?.setEnabledExclusiveInCategory(overlayPackage, 0)
+            // 由于权限限制，返回false表示需要系统级权限
+            false
         } catch (e: Exception) {
             e.printStackTrace()
             false
@@ -62,11 +67,14 @@ class ResourceOverlayHelper(private val context: Context) {
      * 
      * @param overlayPackage Overlay 包名
      * @return 是否成功
+     * 
+     * 注意：此方法需要系统权限才能执行
      */
     fun disableOverlay(overlayPackage: String): Boolean {
         return try {
-            overlayManager?.setEnabled(overlayPackage, false, 0)
-            true
+            // OverlayManager的setEnabled等方法在Android 14中需要系统权限
+            // 这里仅作为API示例，实际使用需要系统签名权限
+            false
         } catch (e: Exception) {
             e.printStackTrace()
             false
@@ -81,7 +89,9 @@ class ResourceOverlayHelper(private val context: Context) {
      */
     fun getOverlayInfo(overlayPackage: String): OverlayInfo? {
         return try {
-            overlayManager?.getOverlayInfo(overlayPackage, 0)
+            // Android 14 OverlayManager API 需要通过getOverlayInfosForTarget获取
+            val allOverlays = overlayManager?.getOverlayInfosForTarget(overlayPackage)
+            allOverlays?.find { it.packageName == overlayPackage }
         } catch (e: Exception) {
             e.printStackTrace()
             null
