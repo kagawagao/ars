@@ -90,9 +90,11 @@ class ResourceOverlayHelper(private val context: Context) {
     fun getOverlayInfo(overlayPackage: String): OverlayInfo? {
         return try {
             // Android 14 OverlayManager API 需要通过getOverlayInfosForTarget获取
+            // 注意：getOverlayInfosForTarget 返回指定包的 overlay 信息列表
+            // 如果需要获取特定overlay包的信息，应该查询该包所覆盖的目标包
             val allOverlays = overlayManager?.getOverlayInfosForTarget(overlayPackage)
-            // OverlayInfo在Android 14中使用overlayIdentifier.packageName
-            allOverlays?.find { it.overlayIdentifier.packageName == overlayPackage }
+            // 返回第一个 overlay（如果存在）
+            allOverlays?.firstOrNull()
         } catch (e: Exception) {
             e.printStackTrace()
             null
