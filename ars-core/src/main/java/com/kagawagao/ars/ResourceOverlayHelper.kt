@@ -1,5 +1,6 @@
 package com.kagawagao.ars
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.om.OverlayInfo
 import android.content.om.OverlayManager
@@ -15,6 +16,7 @@ import androidx.annotation.RequiresApi
 @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
 class ResourceOverlayHelper(private val context: Context) {
     
+    @SuppressLint("WrongConstant")
     private val overlayManager: OverlayManager? by lazy {
         context.getSystemService(Context.OVERLAY_SERVICE) as? OverlayManager
     }
