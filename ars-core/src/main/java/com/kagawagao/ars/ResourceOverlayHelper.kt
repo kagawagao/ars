@@ -16,7 +16,7 @@ import androidx.annotation.RequiresApi
 @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
 class ResourceOverlayHelper(private val context: Context) {
     
-    @SuppressLint("WrongConstant")
+    @get:SuppressLint("WrongConstant")
     private val overlayManager: OverlayManager? by lazy {
         context.getSystemService(Context.OVERLAY_SERVICE) as? OverlayManager
     }
