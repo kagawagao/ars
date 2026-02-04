@@ -14,7 +14,7 @@ import java.io.FileOutputStream
  * 2. 外部存储的皮肤包文件
  * 3. 网络下载的皮肤包
  */
-@RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+@RequiresApi(34)
 class SkinLoader(private val context: Context) {
     
     companion object {

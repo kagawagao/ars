@@ -18,7 +18,7 @@ import androidx.core.content.ContextCompat
  * 2. 应用皮肤资源到 View
  * 3. 支持常见属性的动态切换
  */
-@RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+@RequiresApi(34)
 class SkinAttribute(private val context: Context) {
     
     companion object {
@@ -47,11 +47,12 @@ class SkinAttribute(private val context: Context) {
         
         for (i in 0 until attrs.attributeCount) {
             val attrName = attrs.getAttributeName(i)
-            val attrValue = attrs.getAttributeValue(i)
             
-            if (attrName in SUPPORTED_ATTRS && attrValue.startsWith("@")) {
-                val resId = attrValue.substring(1).toIntOrNull() ?: continue
-                applyAttribute(view, attrName, resId, skinManager)
+            if (attrName in SUPPORTED_ATTRS) {
+                val resId = attrs.getAttributeResourceValue(i, 0)
+                if (resId != 0) {
+                    applyAttribute(view, attrName, resId, skinManager)
+                }
             }
         }
     }
@@ -78,7 +79,16 @@ class SkinAttribute(private val context: Context) {
                         view.setTextColor(color)
                     }
                 }
-                // 可以添加更多属性支持
+                "drawableLeft", "drawableTop", "drawableRight", "drawableBottom" -> {
+                    if (view is TextView) {
+                        val drawables = view.compoundDrawables
+                        val left = if (attrName == "drawableLeft") getDrawable(resId, skinManager) else drawables[0]
+                        val top = if (attrName == "drawableTop") getDrawable(resId, skinManager) else drawables[1]
+                        val right = if (attrName == "drawableRight") getDrawable(resId, skinManager) else drawables[2]
+                        val bottom = if (attrName == "drawableBottom") getDrawable(resId, skinManager) else drawables[3]
+                        view.setCompoundDrawablesWithIntrinsicBounds(left, top, right, bottom)
+                    }
+                }
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -90,15 +100,6 @@ class SkinAttribute(private val context: Context) {
      */
     private fun getDrawable(resId: Int, skinManager: ArsSkinManager): Drawable? {
         val resources = skinManager.getTargetResources()
-        return resources.getDrawable(resId, context.theme)
+        return androidx.core.content.res.ResourcesCompat.getDrawable(resources, resId, context.theme)
     }
-    
-    /**
-     * 存储的皮肤属性项
-     */
-    data class SkinItem(
-        val view: View,
-        val attrName: String,
-        val resId: Int
-    )
 }

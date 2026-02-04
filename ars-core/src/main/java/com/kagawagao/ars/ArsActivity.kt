@@ -11,7 +11,7 @@ import androidx.appcompat.app.AppCompatActivity
  * 提供自动换肤支持的 Activity
  * 继承此类的 Activity 会自动响应主题切换
  */
-@RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+@RequiresApi(34)
 open class ArsActivity : AppCompatActivity(), ArsSkinManager.ThemeChangeListener {
     
     private lateinit var skinManager: ArsSkinManager
@@ -29,6 +29,9 @@ open class ArsActivity : AppCompatActivity(), ArsSkinManager.ThemeChangeListener
     
     override fun onThemeChanged(mode: ArsSkinManager.ThemeMode) {
         // 主题改变时重建 Activity
+        // 注意：调用 recreate() 会导致 Activity 完全重建，可能造成状态丢失
+        // 建议在调用前保存状态（通过 onSaveInstanceState）
+        // 或考虑实现更细粒度的视图刷新机制
         recreate()
     }
     

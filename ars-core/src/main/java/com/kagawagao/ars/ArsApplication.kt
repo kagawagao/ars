@@ -10,7 +10,7 @@ import androidx.annotation.RequiresApi
  * 使用 ARS 框架的应用需要继承此类
  * 或在自己的 Application 中初始化 ArsSkinManager
  */
-@RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+@RequiresApi(34)
 open class ArsApplication : Application() {
     
     override fun onCreate() {

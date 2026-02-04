@@ -19,7 +19,7 @@ import java.lang.ref.WeakReference
  * 3. 支持动态加载外部皮肤包资源
  * 4. 支持 Android 14+ 的 ResourceOverlay 机制
  */
-@RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+@RequiresApi(34)
 class ArsSkinManager private constructor(private val context: Context) {
     
     private var skinResources: Resources? = null
@@ -62,21 +62,20 @@ class ArsSkinManager private constructor(private val context: Context) {
             
             skinPackageName = packageInfo.packageName
             
-            // 创建 AssetManager 实例
-            // 注意：使用反射是因为 addAssetPath 是隐藏 API
-            // 在某些设备或未来版本可能受限，建议使用 PackageManager 或其他官方 API
-            val assetManager = AssetManager::class.java.getDeclaredConstructor().newInstance()
-            val addAssetPath = AssetManager::class.java.getDeclaredMethod("addAssetPath", String::class.java)
-            addAssetPath.isAccessible = true
-            addAssetPath.invoke(assetManager, skinPath)
+            // 使用 PackageManager 和 ApplicationInfo 加载皮肤包资源
+            // 避免通过反射调用隐藏的 AssetManager.addAssetPath API，以提高兼容性和安全性
+            val appInfo = packageInfo.applicationInfo?.apply {
+                // 确保资源加载指向外部皮肤包 APK 路径
+                sourceDir = skinPath
+                publicSourceDir = skinPath
+            } ?: return false
             
-            // 创建皮肤包的 Resources 实例
+            // 创建皮肤包的 Resources 实例（官方支持的方式）
+            val skinRes = packageManager.getResourcesForApplication(appInfo)
             val superRes = context.resources
-            skinResources = Resources(
-                assetManager,
-                superRes.displayMetrics,
-                superRes.configuration
-            )
+            // 尽量保持与宿主相同的配置和显示参数
+            skinRes.updateConfiguration(superRes.configuration, superRes.displayMetrics)
+            skinResources = skinRes
             
             notifyThemeChanged()
             true
