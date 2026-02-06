@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">ARS Demo</string>
+    <string name="load_skin">加载皮肤</string>
+    <string name="reset_skin">重置皮肤</string>
+    <string name="switch_to_dark">切换到深色模式</string>
+    <string name="switch_to_light">切换到浅色模式</string>
+    <string name="theme_demo">主题演示</string>
+    <string name="current_theme">当前主题: %s</string>
+</resources>
