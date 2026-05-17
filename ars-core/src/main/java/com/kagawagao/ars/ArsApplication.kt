@@ -1,16 +1,15 @@
 package com.kagawagao.ars
 
-import android.app.Activity
 import android.app.Application
 import android.os.Build
-import android.os.Bundle
 import androidx.annotation.RequiresApi
 
 /**
  * Base Application for ARS-skinning-enabled applications.
  *
- * Extend this instead of [Application]. Initializes [ArsSkinEngine] on startup
- * and registers [ActivityLifecycleCallbacks] for tracking active activities.
+ * Extend this instead of [Application]. Initializes [ArsSkinEngine] on startup.
+ * Activity lifecycle tracking is handled by [ArsActivity] registering itself
+ * directly with the engine via [ArsSkinEngine.registerActiveActivity].
  *
  * ## Usage
  *
@@ -43,35 +42,5 @@ open class ArsApplication : Application() {
 
         // Initialize the skin engine — must happen before any Activity starts
         ArsSkinEngine.init(this)
-
-        // Track active activities for View-tree walking context
-        registerActivityLifecycleCallbacks(ActivityTracker())
-    }
-
-    /**
-     * Internal ActivityLifecycleCallbacks that maintains a weak reference
-     * to the most recently resumed Activity. Used by the View-tree walker
-     * to know which decorView to process when a skin switch occurs.
-     */
-    private class ActivityTracker : ActivityLifecycleCallbacks {
-
-        @Volatile
-        private var activeActivity: Activity? = null
-
-        override fun onActivityResumed(activity: Activity) {
-            activeActivity = activity
-        }
-
-        override fun onActivityPaused(activity: Activity) {
-            if (activeActivity === activity) {
-                activeActivity = null
-            }
-        }
-
-        override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {}
-        override fun onActivityStarted(activity: Activity) {}
-        override fun onActivityStopped(activity: Activity) {}
-        override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {}
-        override fun onActivityDestroyed(activity: Activity) {}
     }
 }

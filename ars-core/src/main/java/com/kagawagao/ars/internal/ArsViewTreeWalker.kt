@@ -46,7 +46,7 @@ internal object ArsViewTreeWalker {
         queue.add(root)
 
         while (queue.isNotEmpty()) {
-            val view = queue.poll()
+            val view = queue.poll() ?: continue
 
             // Skip if tagged for exclusion
             if (shouldSkip(view)) continue

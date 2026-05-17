@@ -107,6 +107,13 @@ internal class SkinLayoutInflater(
         if (bindings.isNotEmpty()) {
             val meta = SkinViewMeta(WeakReference(view), bindings)
             engine.registerView(view, meta)
+
+            // Immediately apply the active skin to this newly created View
+            // so that dynamically added Views are skin-aware without waiting
+            // for the next explicit skin switch or refreshSkin() call.
+            if (engine.activeSkin != null) {
+                engine.applySkinToView(view, meta)
+            }
         }
     }
 

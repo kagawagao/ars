@@ -198,7 +198,12 @@ class MainActivity : ArsActivity() {
             appendLine("Registered Views: ${diag.registeredViewCount}")
             appendLine("Alive Views:      ${diag.aliveViewCount}")
             appendLine("Listeners:        ${diag.listenerCount}")
-            appendLine("Custom Handlers:  ${diag.handlerCount}")
+            appendLine("Custom Handlers:  ${diag.registeredAttributeCount}")
+            appendLine("Cached Mappings:  ${diag.cachedIdMappings}")
+            appendLine("Last Switch:      ${if (diag.lastSwitchDurationMs >= 0) "${diag.lastSwitchDurationMs}ms" else "N/A"}")
+            if (diag.lastError != null) {
+                appendLine("Last Error:       ${diag.lastError!!.message}")
+            }
         }
         tvDiagnostics.text = text
     }

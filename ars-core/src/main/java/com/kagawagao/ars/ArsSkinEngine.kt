@@ -10,6 +10,7 @@ import com.kagawagao.ars.internal.ArsSkinLoader
 import com.kagawagao.ars.internal.ArsViewTreeWalker
 import com.kagawagao.ars.internal.AttrBinding
 import com.kagawagao.ars.internal.ResourceType
+import com.kagawagao.ars.internal.SkinAttributeResolver
 import com.kagawagao.ars.internal.SkinContextWrapper
 import com.kagawagao.ars.internal.SkinLayoutInflater
 import com.kagawagao.ars.internal.SkinResources
@@ -22,6 +23,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.lang.ref.WeakReference
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Central engine for the ARS skinning framework.
@@ -55,6 +57,7 @@ object ArsSkinEngine {
 
     private val engineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val switchLock = Mutex()
+    private val switchInProgress = AtomicBoolean(false)
 
     // ─── State ────────────────────────────────────────────────────────
 
@@ -81,9 +84,64 @@ object ArsSkinEngine {
     @Volatile
     private var initialized = false
 
+    /** Duration of the most recent skin switch in milliseconds (-1 if none). */
+    @Volatile
+    var lastSwitchDurationMs: Long = -1
+        private set
+
+    /** The most recent skin error, or null. */
+    @Volatile
+    var lastError: SkinError? = null
+        private set
+
+    /** Controls whether debug-level resource resolution logging is enabled. */
+    @Volatile
+    var debugLogging: Boolean = false
+
+    // ─── Resource ID Cache ─────────────────────────────────────────────
+
+    /**
+     * LRU cache for (hostResId → skinResId) mappings per DD-10.
+     *
+     * Keyed by host resource ID. Each entry maps to the corresponding skin
+     * resource ID. Entries are evicted on memory pressure. When the active
+     * skin changes, the cache is invalidated.
+     *
+     * Default capacity: 256 entries.
+     */
+    private val resourceIdCache = object : android.util.LruCache<Int, Int>(256) {
+        override fun sizeOf(key: Int, value: Int): Int = 1
+    }
+
+    /**
+     * Look up a skin resource ID from the cache, resolving and caching if absent.
+     *
+     * @param hostResId The host application resource ID.
+     * @param resolver A lambda that resolves the skin ID (called on cache miss).
+     * @return The skin resource ID, or 0 if not found.
+     */
+    internal fun cachedResolveSkinId(hostResId: Int, resolver: () -> Int): Int {
+        val cached = resourceIdCache.get(hostResId)
+        if (cached != null) return cached
+        val resolved = resolver()
+        if (resolved != 0) {
+            resourceIdCache.put(hostResId, resolved)
+        }
+        return resolved
+    }
+
+    /**
+     * Invalidate all cached resource ID mappings.
+     *
+     * Called automatically on skin switch and reset.
+     */
+    private fun invalidateIdCache() {
+        resourceIdCache.evictAll()
+    }
+
     // ─── Listeners ────────────────────────────────────────────────────
 
-    private val skinChangeListeners = mutableSetOf<SkinChangeListener>()
+    private val skinChangeListeners = java.util.concurrent.ConcurrentHashMap.newKeySet<SkinChangeListener>()
 
     // ─── Attribute Handlers ───────────────────────────────────────────
 
@@ -156,6 +214,7 @@ object ArsSkinEngine {
         // Load skin on IO thread
         val loadResult = loader.load(skinPath)
         if (loadResult is SkinResult.Error) {
+            lastError = loadResult.error
             return loadResult
         }
 
@@ -175,6 +234,8 @@ object ArsSkinEngine {
     suspend fun switchSkin(skin: SkinPackage): SkinResult<Unit> {
         ensureInitialized()
 
+        val startTime = System.currentTimeMillis()
+
         return switchLock.withLock {
             // Store previous for listener notification
             val oldSkin = activeSkin
@@ -187,6 +248,9 @@ object ArsSkinEngine {
                 // Release previous skin resources to avoid memory leaks
                 oldSkin?.dispose()
 
+                // Invalidate resource ID cache since the skin changed
+                invalidateIdCache()
+
                 // Update all SkinResources instances so that
                 // context.resources.getColor() etc. return skin values
                 updateAllSkinResources(skin.resources, skin.packageName)
@@ -194,11 +258,39 @@ object ArsSkinEngine {
                 // Walk View trees for all active Activities
                 walkAllActivityTrees()
 
+                // Track timing
+                lastSwitchDurationMs = System.currentTimeMillis() - startTime
+                lastError = null
+
                 // Notify listeners (copy-on-iterate to avoid concurrent modification)
                 notifySkinChangeListeners(oldSkin, skin)
             }
 
             SkinResult.Success(Unit)
+        }
+    }
+
+    /**
+     * Non-blocking attempt to switch skins.
+     *
+     * If a skin switch is already in progress, returns immediately with
+     * [SkinError.SwitchInProgress] instead of waiting for the lock.
+     * Use [switchSkin] for the blocking (default) behaviour.
+     *
+     * @param skin The loaded skin package.
+     * @return [SkinResult.Success] on success, [SkinResult.Error] with
+     *         [SkinError.SwitchInProgress] if another switch is active.
+     */
+    suspend fun trySwitchSkin(skin: SkinPackage): SkinResult<Unit> {
+        ensureInitialized()
+
+        if (!switchInProgress.compareAndSet(false, true)) {
+            return SkinResult.Error(SkinError.SwitchInProgress)
+        }
+        return try {
+            switchSkin(skin)
+        } finally {
+            switchInProgress.set(false)
         }
     }
 
@@ -302,7 +394,8 @@ object ArsSkinEngine {
             baseResources = base.resources,
             skinResources = activeSkin?.resources,
             skinPackageName = activeSkin?.packageName,
-            hostPackageName = base.packageName
+            hostPackageName = base.packageName,
+            idCacheResolver = ::cachedResolveSkinId
         )
 
         // Track this SkinResources instance so it can be updated on skin switch
@@ -389,6 +482,7 @@ object ArsSkinEngine {
      */
     fun getDiagnostics(): SkinDiagnostics {
         val aliveViewCount = viewRegistry.values.count { it.viewRef.get() != null }
+        val builtInAttrCount = SkinAttributeResolver.DEFAULT_SUPPORTED_ATTRIBUTES.size
 
         return SkinDiagnostics(
             activeSkinName = activeSkin?.name,
@@ -398,7 +492,10 @@ object ArsSkinEngine {
             registeredViewCount = viewRegistry.size,
             aliveViewCount = aliveViewCount,
             listenerCount = skinChangeListeners.size,
-            handlerCount = attributeHandlers.size
+            registeredAttributeCount = builtInAttrCount + attributeHandlers.size,
+            cachedIdMappings = resourceIdCache.snapshot().size,
+            lastSwitchDurationMs = lastSwitchDurationMs,
+            lastError = lastError
         )
     }
 

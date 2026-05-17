@@ -4,6 +4,7 @@ import android.content.res.ColorStateList
 import android.content.res.Resources
 import android.graphics.drawable.Drawable
 import android.os.Build
+import android.util.Log
 import android.util.TypedValue
 import androidx.annotation.RequiresApi
 
@@ -35,8 +36,13 @@ internal class SkinResources(
     private val baseResources: Resources,
     private var skinResources: Resources?,
     private var skinPackageName: String?,
-    private val hostPackageName: String
+    private val hostPackageName: String,
+    private val idCacheResolver: ((Int, () -> Int) -> Int)? = null
 ) : Resources(baseResources.assets, baseResources.displayMetrics, baseResources.configuration) {
+
+    companion object {
+        private const val TAG = "SkinResources"
+    }
 
     // ─── Color ────────────────────────────────────────────────────────
 
@@ -192,12 +198,28 @@ internal class SkinResources(
         val skinRes = skinResources ?: return 0
         val skinPkg = skinPackageName ?: return 0
 
-        return try {
-            val resName = baseResources.getResourceEntryName(hostResId)
-            val resType = baseResources.getResourceTypeName(hostResId)
-            skinRes.getIdentifier(resName, resType, skinPkg)
-        } catch (e: Resources.NotFoundException) {
-            0
+        val resolver = {
+            try {
+                val resName = baseResources.getResourceEntryName(hostResId)
+                val resType = baseResources.getResourceTypeName(hostResId)
+                skinRes.getIdentifier(resName, resType, skinPkg)
+            } catch (e: Resources.NotFoundException) {
+                0
+            }
         }
+
+        // Use the engine's LRU cache if available, otherwise resolve directly
+        val result = idCacheResolver?.invoke(hostResId, resolver) ?: resolver()
+
+        // Debug logging for missing resources
+        if (result == 0 && Log.isLoggable(TAG, Log.DEBUG)) {
+            try {
+                val resName = baseResources.getResourceEntryName(hostResId)
+                val resType = baseResources.getResourceTypeName(hostResId)
+                Log.d(TAG, "Resource '$resName' ($resType) not found in skin package '$skinPkg'")
+            } catch (_: Resources.NotFoundException) { }
+        }
+
+        return result
     }
 }
