@@ -79,12 +79,16 @@ open class ArsActivity : AppCompatActivity(), SkinChangeListener {
 
         // Register for skin change notifications
         ArsSkinEngine.registerSkinChangeListener(this)
+
+        // Register for automatic View-tree walking during skin switches
+        ArsSkinEngine.registerActiveActivity(this)
     }
 
     @CallSuper
     override fun onDestroy() {
         super.onDestroy()
         ArsSkinEngine.unregisterSkinChangeListener(this)
+        ArsSkinEngine.unregisterActiveActivity(this)
     }
 
     // ─── State Preservation (FR-P0-04) ────────────────────────────────
@@ -144,13 +148,15 @@ open class ArsActivity : AppCompatActivity(), SkinChangeListener {
     /**
      * SkinChangeListener implementation.
      *
-     * Walks the View tree and applies the new skin, then calls [onSkinApplied]
-     * for subclass-level customization. This is `final` — override [onSkinApplied] instead.
+     * The engine has already walked the View tree and applied the skin before
+     * this callback fires. This method delegates to [onSkinApplied] for
+     * subclass-level customization.
+     *
+     * This is `final` — override [onSkinApplied] instead.
      */
     final override fun onSkinChanged(previous: SkinPackage?, current: SkinPackage?) {
-        // Walk the View tree to apply the new skin
-        ArsViewTreeWalker.walk(window.decorView, ArsSkinEngine)
-        // Notify subclass
+        // The engine has already walked the View tree.
+        // Only notify the subclass for custom post-skin-switch behavior.
         onSkinApplied(previous, current)
     }
 
@@ -160,6 +166,9 @@ open class ArsActivity : AppCompatActivity(), SkinChangeListener {
      * Re-apply the current skin to this Activity's View tree.
      *
      * Useful after programmatically adding Views or changing the layout.
+     * Note: This only walks *this* Activity's tree — it does not update
+     * SkinResources or notify other listeners. For a full skin switch,
+     * use [ArsSkinEngine.switchSkin] instead.
      */
     fun refreshSkin() {
         ArsViewTreeWalker.walk(window.decorView, ArsSkinEngine)

@@ -104,10 +104,13 @@ open class ArsFragment : Fragment(), SkinChangeListener {
 
     /**
      * SkinChangeListener implementation.
+     *
+     * The engine has already walked the View tree before this callback fires.
+     * This method delegates to [onSkinApplied] for subclass-level customization.
      */
     final override fun onSkinChanged(previous: SkinPackage?, current: SkinPackage?) {
-        val root = fragmentRootView ?: return
-        ArsViewTreeWalker.walk(root, ArsSkinEngine)
+        // The engine has already walked the View tree.
+        // Only notify the subclass for custom post-skin-switch behavior.
         onSkinApplied(previous, current)
     }
 

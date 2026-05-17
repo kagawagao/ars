@@ -7,6 +7,7 @@ import android.view.LayoutInflater
 import android.view.View
 import androidx.annotation.RequiresApi
 import com.kagawagao.ars.internal.ArsSkinLoader
+import com.kagawagao.ars.internal.ArsViewTreeWalker
 import com.kagawagao.ars.internal.AttrBinding
 import com.kagawagao.ars.internal.ResourceType
 import com.kagawagao.ars.internal.SkinContextWrapper
@@ -19,6 +20,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.lang.ref.WeakReference
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -98,6 +100,28 @@ object ArsSkinEngine {
      */
     private val viewRegistry = ConcurrentHashMap<Int, SkinViewMeta>()
 
+    // ─── SkinResources Tracking ────────────────────────────────────────
+
+    /**
+     * Registry of all active [SkinResources] instances created by [wrapContext].
+     *
+     * Uses [WeakReference] to avoid leaking SkinResources (and thereby
+     * Context/Activity) after their owning component is destroyed. On each
+     * skin switch, all alive instances are updated via [SkinResources.updateSkin].
+     */
+    private val skinResourcesRefs = mutableSetOf<WeakReference<SkinResources>>()
+
+    // ─── Active Activities ─────────────────────────────────────────────
+
+    /**
+     * Set of currently active [android.app.Activity] instances that have
+     * opted into skinning (typically via extending [ArsActivity]).
+     *
+     * Populated by [registerActiveActivity] / [unregisterActiveActivity].
+     * Used during skin switch to walk each Activity's View tree.
+     */
+    private val activeActivities = mutableSetOf<WeakReference<android.app.Activity>>()
+
     // ─── Initialization ───────────────────────────────────────────────
 
     /**
@@ -160,21 +184,15 @@ object ArsSkinEngine {
                 previousSkin = oldSkin
                 activeSkin = skin
 
-                // Update all SkinResources instances with the new skin
-                // (This will be done via registered SkinResources references in a full implementation)
+                // Update all SkinResources instances so that
+                // context.resources.getColor() etc. return skin values
+                updateAllSkinResources(skin.resources, skin.packageName)
 
-                // TODO Phase B: Walk View tree via ArsViewTreeWalker
-                // ArsViewTreeWalker.walk(decorView, this@ArsSkinEngine)
+                // Walk View trees for all active Activities
+                walkAllActivityTrees()
 
                 // Notify listeners (copy-on-iterate to avoid concurrent modification)
-                val listeners = skinChangeListeners.toList()
-                for (listener in listeners) {
-                    try {
-                        listener.onSkinChanged(oldSkin, skin)
-                    } catch (e: Exception) {
-                        // Swallow listener exceptions — framework must not crash
-                    }
-                }
+                notifySkinChangeListeners(oldSkin, skin)
             }
 
             SkinResult.Success(Unit)
@@ -196,14 +214,14 @@ object ArsSkinEngine {
                 previousSkin = oldSkin
                 activeSkin = null
 
-                // TODO Phase B: Walk View tree to reset all Views to default
+                // Reset all SkinResources to default (host) resources
+                updateAllSkinResources(null, null)
 
-                val listeners = skinChangeListeners.toList()
-                for (listener in listeners) {
-                    try {
-                        listener.onSkinChanged(oldSkin, null)
-                    } catch (_: Exception) { }
-                }
+                // Walk View trees to reset all Views to default
+                walkAllActivityTrees()
+
+                // Notify listeners
+                notifySkinChangeListeners(oldSkin, null)
             }
 
             SkinResult.Success(Unit)
@@ -227,8 +245,37 @@ object ArsSkinEngine {
         if (currentThemeMode == mode) return
         currentThemeMode = mode
 
-        // TODO Phase B: Re-apply configuration and walk View tree
-        // If activeSkin is set, update its Resources configuration and re-walk
+        val appCtx = appContext ?: return
+
+        // Calculate the target UI mode for the configuration
+        val targetUiMode = when (mode) {
+            SkinPackage.ThemeMode.DARK ->
+                android.content.res.Configuration.UI_MODE_NIGHT_YES
+            SkinPackage.ThemeMode.LIGHT ->
+                android.content.res.Configuration.UI_MODE_NIGHT_NO
+        }
+
+        // Update the skin Resources configuration so that values-night/ etc.
+        // are resolved correctly on the next resource lookup
+        activeSkin?.resources?.let { skinRes ->
+            val config = android.content.res.Configuration(skinRes.configuration).apply {
+                uiMode = (uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK.inv()) or targetUiMode
+            }
+            skinRes.updateConfiguration(config, skinRes.displayMetrics)
+        }
+
+        // Also update the host app's base Resources configuration
+        // so that default (non-skinned) Views pick up the theme change
+        val appConfig = android.content.res.Configuration(appCtx.resources.configuration).apply {
+            uiMode = (uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK.inv()) or targetUiMode
+        }
+        appCtx.resources.updateConfiguration(appConfig, appCtx.resources.displayMetrics)
+
+        // Walk all View trees so that all Views reflect the new theme
+        walkAllActivityTrees()
+
+        // Notify listeners that the effective skin/theme has changed
+        notifySkinChangeListeners(activeSkin, activeSkin)
     }
 
     // ─── Context Wrapping ──────────────────────────────────────────────
@@ -251,6 +298,9 @@ object ArsSkinEngine {
             skinPackageName = activeSkin?.packageName,
             hostPackageName = base.packageName
         )
+
+        // Track this SkinResources instance so it can be updated on skin switch
+        skinResourcesRefs.add(WeakReference(skinRes))
 
         return SkinContextWrapper(base, skinRes)
     }
@@ -349,6 +399,30 @@ object ArsSkinEngine {
     // ─── Lifecycle ─────────────────────────────────────────────────────
 
     /**
+     * Register an Activity for automatic View-tree walking during skin switches.
+     *
+     * Called by [ArsActivity] in [android.app.Activity.onCreate].
+     * The engine walks this Activity's decorView on every [switchSkin],
+     * [resetToDefault], and [setThemeMode] call.
+     *
+     * @param activity The Activity to register.
+     */
+    fun registerActiveActivity(activity: android.app.Activity) {
+        activeActivities.add(WeakReference(activity))
+    }
+
+    /**
+     * Unregister an Activity from automatic View-tree walking.
+     *
+     * Called by [ArsActivity] in [android.app.Activity.onDestroy].
+     *
+     * @param activity The Activity to unregister.
+     */
+    fun unregisterActiveActivity(activity: android.app.Activity) {
+        activeActivities.removeAll { it.get() == null || it.get() === activity }
+    }
+
+    /**
      * Release all skin resources and clear state.
      *
      * Called when the host [Application] is terminated.
@@ -362,8 +436,72 @@ object ArsSkinEngine {
             skinChangeListeners.clear()
             attributeHandlers.clear()
             viewRegistry.clear()
+            skinResourcesRefs.clear()
+            activeActivities.clear()
             skinLoader = null
             initialized = false
+        }
+    }
+
+    // ─── Private: Skin Update Helpers ───────────────────────────────────
+
+    /**
+     * Update all tracked [SkinResources] instances with new skin data.
+     *
+     * Called during [switchSkin] and [resetToDefault] before walking
+     * View trees, so that `context.resources.getColor()` etc. return
+     * values from the new skin.
+     *
+     * @param newResources The new skin's Resources, or `null` to reset to default.
+     * @param newPackageName The new skin's package name, or `null` to reset.
+     */
+    private fun updateAllSkinResources(newResources: android.content.res.Resources?, newPackageName: String?) {
+        // Purge GC'd references
+        skinResourcesRefs.removeAll { it.get() == null }
+        // Update all alive instances
+        skinResourcesRefs.forEach { ref ->
+            ref.get()?.updateSkin(newResources, newPackageName)
+        }
+    }
+
+    /**
+     * Walk the View tree of every registered active Activity.
+     *
+     * Called during [switchSkin], [resetToDefault], and [setThemeMode].
+     * Applies the current skin to all registered Views in each Activity.
+     */
+    private fun walkAllActivityTrees() {
+        // Purge GC'd references
+        activeActivities.removeAll { it.get() == null }
+        activeActivities.forEach { ref ->
+            ref.get()?.let { activity ->
+                try {
+                    ArsViewTreeWalker.walk(activity.window?.decorView ?: return@let, this)
+                } catch (_: Exception) {
+                    // Activity may have been destroyed between registration and walk
+                }
+            }
+        }
+    }
+
+    /**
+     * Notify all registered [SkinChangeListener] instances of a skin change.
+     *
+     * Copy-on-iterate pattern prevents concurrent modification if a listener
+     * registers/unregisters during notification. Listener exceptions are
+     * swallowed — the framework must not crash due to listener bugs.
+     *
+     * @param previous The previously active skin, or `null`.
+     * @param current The newly active skin, or `null`.
+     */
+    private fun notifySkinChangeListeners(previous: SkinPackage?, current: SkinPackage?) {
+        val listeners = skinChangeListeners.toList()
+        for (listener in listeners) {
+            try {
+                listener.onSkinChanged(previous, current)
+            } catch (_: Exception) {
+                // Swallow listener exceptions — framework must not crash
+            }
         }
     }
 

@@ -30,6 +30,7 @@ import androidx.annotation.RequiresApi
  * @param hostPackageName The host application's package name (for resource name parsing).
  */
 @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+@Suppress("DEPRECATION")  // getDrawable(int, Theme) deprecated API 34, removed API 36
 internal class SkinResources(
     private val baseResources: Resources,
     private var skinResources: Resources?,
