@@ -163,6 +163,40 @@ open class ArsActivity : AppCompatActivity(), SkinChangeListener {
     // ─── Convenience Methods ───────────────────────────────────────────
 
     /**
+     * Load and switch to a skin from a file path.
+     *
+     * Convenience wrapper around [ArsSkinEngine.switchSkin].
+     * Loading (I/O) is performed on a background thread.
+     *
+     * @param skinPath Absolute path to the skin APK file.
+     * @return [SkinResult.Success] on success, [SkinResult.Error] on failure.
+     */
+    protected suspend fun switchSkin(skinPath: String): SkinResult<Unit> {
+        return ArsSkinEngine.switchSkin(skinPath)
+    }
+
+    /**
+     * Reset to the default (host app) resources.
+     *
+     * @return [SkinResult.Success] on success.
+     */
+    protected suspend fun resetSkin(): SkinResult<Unit> {
+        return ArsSkinEngine.resetToDefault()
+    }
+
+    /**
+     * Set the theme mode for the current skin.
+     *
+     * Triggers a View-tree refresh so all Views reflect the new theme's
+     * qualified resources (e.g., `values-night/`).
+     *
+     * @param mode The target theme mode.
+     */
+    protected fun setSkinThemeMode(mode: SkinPackage.ThemeMode) {
+        ArsSkinEngine.setThemeMode(mode)
+    }
+
+    /**
      * Re-apply the current skin to this Activity's View tree.
      *
      * Useful after programmatically adding Views or changing the layout.

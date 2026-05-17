@@ -74,8 +74,10 @@ internal class SkinResources(
         val skinId = resolveSkinId(id)
         return if (skinId != 0) {
             skinResources!!.getDrawableForDensity(skinId, density, theme)
+                ?: throw Resources.NotFoundException("Skin drawable resource ID #0x${Integer.toHexString(skinId)}")
         } else {
             baseResources.getDrawableForDensity(id, density, theme)
+                ?: throw Resources.NotFoundException("Drawable resource ID #0x${Integer.toHexString(id)}")
         }
     }
 

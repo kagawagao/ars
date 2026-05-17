@@ -184,6 +184,9 @@ object ArsSkinEngine {
                 previousSkin = oldSkin
                 activeSkin = skin
 
+                // Release previous skin resources to avoid memory leaks
+                oldSkin?.dispose()
+
                 // Update all SkinResources instances so that
                 // context.resources.getColor() etc. return skin values
                 updateAllSkinResources(skin.resources, skin.packageName)
@@ -213,6 +216,9 @@ object ArsSkinEngine {
             withContext(Dispatchers.Main) {
                 previousSkin = oldSkin
                 activeSkin = null
+
+                // Release previous skin resources to avoid memory leaks
+                oldSkin?.dispose()
 
                 // Reset all SkinResources to default (host) resources
                 updateAllSkinResources(null, null)
@@ -429,17 +435,22 @@ object ArsSkinEngine {
      * After calling this, [init] must be called again before any other method.
      */
     fun dispose() {
-        switchLock.withLock {
-            activeSkin?.dispose()
-            activeSkin = null
-            previousSkin = null
-            skinChangeListeners.clear()
-            attributeHandlers.clear()
-            viewRegistry.clear()
-            skinResourcesRefs.clear()
-            activeActivities.clear()
-            skinLoader = null
-            initialized = false
+        // Use runBlocking to bridge the suspend switchLock.withLock from a non-suspend context.
+        // dispose() is called during Application.onTerminate() — blocking is acceptable here
+        // since the process is shutting down and no other coroutines are active.
+        kotlinx.coroutines.runBlocking {
+            switchLock.withLock {
+                activeSkin?.dispose()
+                activeSkin = null
+                previousSkin = null
+                skinChangeListeners.clear()
+                attributeHandlers.clear()
+                viewRegistry.clear()
+                skinResourcesRefs.clear()
+                activeActivities.clear()
+                skinLoader = null
+                initialized = false
+            }
         }
     }
 
