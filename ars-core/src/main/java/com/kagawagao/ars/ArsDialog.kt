@@ -82,7 +82,9 @@ open class ArsDialog : AppCompatDialog, SkinChangeListener {
      * registered for skin updates.
      */
     private fun installSkinFactory() {
-        val inflater = LayoutInflater.from(context)
+        // Clone the inflater — the Activity's LayoutInflater may already have
+        // Factory2 set. Cloning gives us a fresh instance we can safely set.
+        val inflater = LayoutInflater.from(context).cloneInContext(context)
         val originalFactory = inflater.factory2
         val skinFactory = ArsSkinEngine.createSkinFactory(originalFactory, context)
         inflater.factory2 = skinFactory

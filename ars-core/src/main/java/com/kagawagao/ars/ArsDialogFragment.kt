@@ -102,8 +102,10 @@ open class ArsDialogFragment : DialogFragment(), SkinChangeListener {
         val dialog = Dialog(ctx, theme)
 
         // Install SkinLayoutInflater on the dialog's LayoutInflater
-        // so Views inflated from dialog layouts are automatically registered
-        val inflater = LayoutInflater.from(ctx)
+        // so Views inflated from dialog layouts are automatically registered.
+        // Clone the inflater first — the Activity's LayoutInflater already has
+        // Factory2 set by ArsActivity; cloning gives us a fresh instance.
+        val inflater = LayoutInflater.from(ctx).cloneInContext(ctx)
         val originalFactory = inflater.factory2
         val skinFactory = ArsSkinEngine.createSkinFactory(originalFactory, ctx)
         inflater.factory2 = skinFactory
