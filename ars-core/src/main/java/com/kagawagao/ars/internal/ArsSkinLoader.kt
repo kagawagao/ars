@@ -11,6 +11,10 @@ import com.kagawagao.ars.SkinResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.FileOutputStream
+import java.net.HttpURLConnection
+import java.net.URL
+import java.security.MessageDigest
 
 /**
  * Loads and validates skin APK packages.
@@ -152,6 +156,94 @@ internal class ArsSkinLoader(private val context: Context) {
                 "Unexpected error loading skin: ${e.message}", e
             ))
         }
+    }
+
+    /**
+     * Download a skin package from a URL and load it.
+     *
+     * Downloads the APK to a local file, verifies integrity via SHA-256
+     * checksum (if provided), then loads it via [load].
+     *
+     * @param url The URL to download the skin APK from.
+     * @param skinName A filename for the downloaded skin (e.g., \"holiday_theme.apk\").
+     * @param expectedSha256 Optional SHA-256 hex digest for integrity verification.
+     * @return [SkinResult.Success] with the loaded [SkinPackage], or [SkinResult.Error].
+     */
+    suspend fun loadFromUrl(
+        url: String,
+        skinName: String,
+        expectedSha256: String? = null
+    ): SkinResult<SkinPackage> = withContext(Dispatchers.IO) {
+        try {
+            val destFile = File(context.filesDir, "skins/$skinName").apply {
+                parentFile?.mkdirs()
+            }
+
+            // Download with progress (not reported to caller in this version)
+            downloadFile(url, destFile)
+
+            // Verify checksum if provided
+            if (expectedSha256 != null) {
+                val actual = sha256(destFile)
+                if (!actual.equals(expectedSha256, ignoreCase = true)) {
+                    destFile.delete()
+                    return@withContext SkinResult.Error(
+                        SkinError.CorruptedPackage(destFile.absolutePath,
+                            IllegalStateException("SHA-256 mismatch: expected $expectedSha256, got $actual"))
+                    )
+                }
+            }
+
+            // Load the downloaded skin
+            load(destFile.absolutePath)
+        } catch (e: Exception) {
+            SkinResult.Error(SkinError.StorageError(
+                "Failed to download skin from $url: ${e.message}", e
+            ))
+        }
+    }
+
+    /**
+     * Download a file from a URL to a local destination.
+     */
+    @Throws(java.io.IOException::class)
+    private fun downloadFile(urlString: String, dest: File) {
+        val url = URL(urlString)
+        val connection = url.openConnection() as HttpURLConnection
+        connection.connectTimeout = 30_000
+        connection.readTimeout = 60_000
+
+        try {
+            connection.connect()
+
+            val responseCode = connection.responseCode
+            if (responseCode != HttpURLConnection.HTTP_OK) {
+                throw java.io.IOException("HTTP $responseCode")
+            }
+
+            connection.inputStream.use { input ->
+                FileOutputStream(dest).use { output ->
+                    input.copyTo(output)
+                }
+            }
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    /**
+     * Compute the SHA-256 hex digest of a file.
+     */
+    private fun sha256(file: File): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        file.inputStream().use { input ->
+            val buffer = ByteArray(8192)
+            var bytesRead: Int
+            while (input.read(buffer).also { bytesRead = it } != -1) {
+                digest.update(buffer, 0, bytesRead)
+            }
+        }
+        return digest.digest().joinToString("") { "%02x".format(it) }
     }
 
     /**

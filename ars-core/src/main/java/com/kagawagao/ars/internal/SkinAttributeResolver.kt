@@ -31,8 +31,13 @@ internal object SkinAttributeResolver {
         "background",
         "src",
         "textColor",
+        "textColorHint",
         "textSize",
         "tint",
+        "progressTint",
+        "thumbTint",
+        "trackTint",
+        "buttonTint",
         "drawableStart",
         "drawableEnd",
         "drawableTop",
@@ -119,7 +124,12 @@ internal object SkinAttributeResolver {
         // Step 1: Attribute-name-based heuristics
         when (attributeName) {
             "textColor" -> return ResourceType.COLOR_STATE_LIST
+            "textColorHint" -> return ResourceType.COLOR_STATE_LIST
             "tint" -> return ResourceType.COLOR_STATE_LIST
+            "progressTint" -> return ResourceType.COLOR_STATE_LIST
+            "thumbTint" -> return ResourceType.COLOR_STATE_LIST
+            "trackTint" -> return ResourceType.COLOR_STATE_LIST
+            "buttonTint" -> return ResourceType.COLOR_STATE_LIST
             "textSize" -> return ResourceType.DIMENSION
             "src" -> return ResourceType.DRAWABLE
             "drawableStart", "drawableEnd", "drawableTop", "drawableBottom" -> return ResourceType.DRAWABLE

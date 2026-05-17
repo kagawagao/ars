@@ -326,6 +326,83 @@ object ArsSkinEngine {
         }
     }
 
+    // ─── Skin Preview (FR-P2-04) ───────────────────────────────────────
+
+    /**
+     * Apply a skin temporarily without committing the choice.
+     *
+     * The previous skin is saved and can be restored via [cancelPreview].
+     * The preview skin replaces the active skin for all View-tree walks
+     * and resource lookups, but the engine does not consider it the
+     * \"committed\" active skin — [cancelPreview] will restore the
+     * previously active skin.
+     *
+     * Only one preview can be active at a time. Calling [previewSkin]
+     * while a preview is active replaces it.
+     *
+     * @param skinPath Absolute path to the skin APK file.
+     * @return [SkinResult.Success] if the preview was applied.
+     */
+    suspend fun previewSkin(skinPath: String): SkinResult<Unit> {
+        ensureInitialized()
+        val loader = skinLoader!!
+
+        val loadResult = loader.load(skinPath)
+        if (loadResult is SkinResult.Error) {
+            lastError = loadResult.error
+            return loadResult
+        }
+
+        val skinPackage = (loadResult as SkinResult.Success).value
+        return previewSkin(skinPackage)
+    }
+
+    /**
+     * Apply an already-loaded [SkinPackage] as a preview.
+     */
+    suspend fun previewSkin(skin: SkinPackage): SkinResult<Unit> {
+        ensureInitialized()
+
+        val startTime = System.currentTimeMillis()
+
+        return switchLock.withLock {
+            val oldSkin = activeSkin
+
+            withContext(Dispatchers.Main) {
+                previousSkin = oldSkin
+                activeSkin = skin
+
+                oldSkin?.dispose()
+                invalidateIdCache()
+                updateAllSkinResources(skin.resources, skin.packageName)
+                walkAllActivityTrees()
+
+                lastSwitchDurationMs = System.currentTimeMillis() - startTime
+                lastError = null
+
+                notifySkinChangeListeners(oldSkin, skin)
+            }
+
+            SkinResult.Success(Unit)
+        }
+    }
+
+    /**
+     * Cancel the current preview and restore the previously active skin.
+     *
+     * If no preview is active (i.e., the skin was committed via [switchSkin]),
+     * this is a no-op. After cancellation, the engine state is as it was
+     * before [previewSkin] was called.
+     */
+    suspend fun cancelPreview(): SkinResult<Unit> {
+        ensureInitialized()
+
+        // If there's no previous skin to restore, this is a no-op
+        val restored = previousSkin ?: return SkinResult.Success(Unit)
+
+        return switchSkin(restored)
+    }
+
     // ─── Theme Mode ───────────────────────────────────────────────────
 
     /**
@@ -680,12 +757,17 @@ object ArsSkinEngine {
                             ResourceType.COLOR -> view.setBackgroundColor(skinRes.getColor(binding.resId, null))
                             ResourceType.DRAWABLE, ResourceType.COLOR_STATE_LIST ->
                                 view.background = skinRes.getDrawable(binding.resId, null)
-                            else -> {} // unsupported type for background
+                            else -> {}
                         }
                     }
                     "textColor" -> {
                         if (view is android.widget.TextView) {
                             view.setTextColor(skinRes.getColorStateList(binding.resId, null))
+                        }
+                    }
+                    "textColorHint" -> {
+                        if (view is android.widget.TextView) {
+                            view.setHintTextColor(skinRes.getColorStateList(binding.resId, null))
                         }
                     }
                     "src" -> {
@@ -694,8 +776,23 @@ object ArsSkinEngine {
                         }
                     }
                     "tint" -> {
-                        if (view is android.widget.ImageView) {
-                            view.imageTintList = skinRes.getColorStateList(binding.resId, null)
+                        when (view) {
+                            is android.widget.ImageView -> view.imageTintList = skinRes.getColorStateList(binding.resId, null)
+                        }
+                    }
+                    "progressTint" -> {
+                        if (view is android.widget.ProgressBar) {
+                            view.progressTintList = skinRes.getColorStateList(binding.resId, null)
+                        }
+                    }
+                    "thumbTint" -> {
+                        if (view is android.widget.AbsSeekBar) {
+                            view.thumbTintList = skinRes.getColorStateList(binding.resId, null)
+                        }
+                    }
+                    "buttonTint" -> {
+                        if (view is android.widget.CompoundButton) {
+                            view.buttonTintList = skinRes.getColorStateList(binding.resId, null)
                         }
                     }
                     "textSize" -> {
