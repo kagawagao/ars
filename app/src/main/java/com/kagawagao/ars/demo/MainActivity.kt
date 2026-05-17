@@ -2,16 +2,32 @@ package com.kagawagao.ars.demo
 
 import android.os.Build
 import android.os.Bundle
+import android.view.Gravity
+import android.view.LayoutInflater
 import android.view.View
+import android.view.ViewGroup
+import android.view.ViewStub
+import android.widget.ArrayAdapter
 import android.widget.Button
+import android.widget.CheckBox
 import android.widget.EditText
-import android.widget.ScrollView
+import android.widget.ImageView
+import android.widget.LinearLayout
+import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AlertDialog
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.snackbar.Snackbar
 import com.kagawagao.ars.ArsActivity
+import com.kagawagao.ars.ArsDialogFragment
+import com.kagawagao.ars.ArsOverlaySkin
+import com.kagawagao.ars.ArsPopupWindow
 import com.kagawagao.ars.ArsSkinEngine
+import com.kagawagao.ars.ArsSpinnerAdapter
+import com.kagawagao.ars.ArsToast
 import com.kagawagao.ars.SkinPackage
 import com.kagawagao.ars.SkinResult
 import kotlinx.coroutines.CoroutineScope
@@ -20,28 +36,34 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * ARS V2 演示主界面
+ * ARS V2 Demo — demonstrates all supported UI patterns.
  *
- * 展示的核心功能:
- * - 深色/浅色主题切换（无需皮肤 APK）
- * - 从文件路径加载皮肤包
- * - 重置为默认皮肤
- * - 引擎诊断信息
- * - 皮肤切换回调处理
+ * Layout: activity_main.xml (scrollable pattern catalog)
+ *
+ * Patterns covered:
+ *   🟢 Activity (self), Fragment, DialogFragment, BottomSheet,
+ *      Dialog (ArsDialog), AlertDialog, PopupWindow (ArsPopupWindow),
+ *      Snackbar (ArsOverlaySkin), Toast (ArsToast),
+ *      RecyclerView, Spinner (ArsSpinnerAdapter),
+ *      ViewStub, CustomView (DemoCustomView), Dynamic View,
+ *      Live Preview (ImageView, ProgressBar, CheckBox)
  */
 @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
 class MainActivity : ArsActivity() {
 
+    // ─── Views ────────────────────────────────────────────────────────
     private lateinit var tvCurrentTheme: TextView
     private lateinit var tvSkinStatus: TextView
     private lateinit var btnSwitchTheme: Button
-    private lateinit var btnLoadSkin: Button
-    private lateinit var btnResetSkin: Button
     private lateinit var btnDiagnostics: Button
-    private lateinit var svDiagnostics: ScrollView
     private lateinit var tvDiagnostics: TextView
+    private lateinit var livePreview: LinearLayout
+    private lateinit var viewStub: ViewStub
+    private var viewStubInflated = false
 
     private val scope = CoroutineScope(Dispatchers.Main)
+
+    // ─── Lifecycle ────────────────────────────────────────────────────
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -52,43 +74,83 @@ class MainActivity : ArsActivity() {
         updateUI()
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
-        // CoroutineScope is cancelled manually (no lifecycle-aware scope needed here)
-    }
-
-    // ─── Initialization ────────────────────────────────────────────────
+    // ─── Init ─────────────────────────────────────────────────────────
 
     private fun initViews() {
         tvCurrentTheme = findViewById(R.id.tvCurrentTheme)
         tvSkinStatus = findViewById(R.id.tvSkinStatus)
         btnSwitchTheme = findViewById(R.id.btnSwitchTheme)
-        btnLoadSkin = findViewById(R.id.btnLoadSkin)
-        btnResetSkin = findViewById(R.id.btnResetSkin)
         btnDiagnostics = findViewById(R.id.btnDiagnostics)
-        svDiagnostics = findViewById(R.id.svDiagnostics)
         tvDiagnostics = findViewById(R.id.tvDiagnostics)
+        livePreview = findViewById(R.id.livePreview)
+        viewStub = findViewById(R.id.viewStub)
     }
 
+    @Suppress("DEPRECATION")
     private fun setupListeners() {
+        // ── Controls ──
         btnSwitchTheme.setOnClickListener { toggleTheme() }
-        btnLoadSkin.setOnClickListener { showSkinPathDialog() }
-        btnResetSkin.setOnClickListener { resetSkinToDefault() }
+        findViewById<Button>(R.id.btnLoadSkin).setOnClickListener { showSkinPathDialog() }
+        findViewById<Button>(R.id.btnResetSkin).setOnClickListener { resetSkinToDefault() }
         btnDiagnostics.setOnClickListener { toggleDiagnostics() }
+
+        // ── 🟢 Core Patterns ──
+        findViewById<Button>(R.id.btnFragment).setOnClickListener {
+            supportFragmentManager.beginTransaction()
+                .replace(android.R.id.content, DemoFragment())
+                .addToBackStack(null)
+                .commit()
+        }
+        findViewById<Button>(R.id.btnDialogFragment).setOnClickListener {
+            DemoDialogFragment().show(supportFragmentManager, "dialog")
+        }
+        findViewById<Button>(R.id.btnBottomSheet).setOnClickListener {
+            DemoBottomSheet().show(supportFragmentManager, "bottomSheet")
+        }
+        findViewById<Button>(R.id.btnArsDialog).setOnClickListener {
+            DemoDialog(this).show()
+        }
+        findViewById<Button>(R.id.btnAlertDialog).setOnClickListener {
+            showSkinnedAlertDialog()
+        }
+
+        // ── 🟡 Overlay Patterns ──
+        findViewById<Button>(R.id.btnPopupWindow).setOnClickListener { v ->
+            showSkinnedPopup(v)
+        }
+        findViewById<Button>(R.id.btnSnackbar).setOnClickListener { v ->
+            showSkinnedSnackbar(v)
+        }
+        findViewById<Button>(R.id.btnToast).setOnClickListener {
+            ArsToast.showText(this, "皮肤配色 Toast — ${ArsSkinEngine.currentThemeMode}")
+        }
+
+        // ── 🟢 List Patterns ──
+        findViewById<Button>(R.id.btnRecyclerView).setOnClickListener {
+            showRecyclerDemo()
+        }
+        findViewById<Button>(R.id.btnSpinner).setOnClickListener {
+            showSpinnerDemo()
+        }
+
+        // ── 🟢 Special Patterns ──
+        findViewById<Button>(R.id.btnViewStub).setOnClickListener {
+            inflateViewStub()
+        }
+        findViewById<Button>(R.id.btnCustomView).setOnClickListener {
+            showCustomViewDemo()
+        }
+        findViewById<Button>(R.id.btnDynamicView).setOnClickListener {
+            addDynamicView()
+        }
     }
 
-    // ─── Theme Toggle ──────────────────────────────────────────────────
+    // ═══════════════════════════════════════════════════════════════════
+    // Theme Toggle
+    // ═══════════════════════════════════════════════════════════════════
 
-    /**
-     * Toggle between LIGHT and DARK theme mode.
-     *
-     * This does NOT require a skin APK — it changes the Configuration
-     * UI mode so that `values-night/` resources are activated. Views
-     * are automatically updated via the engine's View-tree walk.
-     */
     private fun toggleTheme() {
-        val currentMode = ArsSkinEngine.currentThemeMode
-        val newMode = when (currentMode) {
+        val newMode = when (ArsSkinEngine.currentThemeMode) {
             SkinPackage.ThemeMode.LIGHT -> SkinPackage.ThemeMode.DARK
             SkinPackage.ThemeMode.DARK -> SkinPackage.ThemeMode.LIGHT
         }
@@ -96,52 +158,41 @@ class MainActivity : ArsActivity() {
         updateUI()
     }
 
-    // ─── Skin Loading ──────────────────────────────────────────────────
+    // ═══════════════════════════════════════════════════════════════════
+    // Skin Loading
+    // ═══════════════════════════════════════════════════════════════════
 
-    /**
-     * Show a dialog prompting the user for a skin APK path.
-     */
     private fun showSkinPathDialog() {
         val input = EditText(this).apply {
             hint = "/sdcard/Download/skin.apk"
             setSingleLine()
         }
-
         AlertDialog.Builder(this)
             .setTitle(getString(R.string.skin_switch_prompt))
             .setView(input)
             .setPositiveButton("加载") { _, _ ->
                 val path = input.text.toString().trim()
-                if (path.isNotEmpty()) {
-                    loadSkinFromPath(path)
-                }
+                if (path.isNotEmpty()) loadSkin(path)
             }
             .setNegativeButton("取消", null)
             .show()
     }
 
-    /**
-     * Load a skin from a file path and apply it.
-     */
-    private fun loadSkinFromPath(path: String) {
+    private fun loadSkin(path: String) {
         scope.launch {
             val result = switchSkin(path)
             withContext(Dispatchers.Main) {
                 when (result) {
                     is SkinResult.Success -> {
                         val skin = ArsSkinEngine.activeSkin
-                        Toast.makeText(
-                            this@MainActivity,
+                        Toast.makeText(this@MainActivity,
                             getString(R.string.skin_loaded, skin?.name ?: "?"),
-                            Toast.LENGTH_SHORT
-                        ).show()
+                            Toast.LENGTH_SHORT).show()
                     }
                     is SkinResult.Error -> {
-                        Toast.makeText(
-                            this@MainActivity,
+                        Toast.makeText(this@MainActivity,
                             getString(R.string.skin_load_failed, result.error.message),
-                            Toast.LENGTH_LONG
-                        ).show()
+                            Toast.LENGTH_LONG).show()
                     }
                 }
                 updateUI()
@@ -149,102 +200,255 @@ class MainActivity : ArsActivity() {
         }
     }
 
-    /**
-     * Reset to the default (host app) resources.
-     */
     private fun resetSkinToDefault() {
         scope.launch {
             resetSkin()
             withContext(Dispatchers.Main) {
-                Toast.makeText(
-                    this@MainActivity,
-                    getString(R.string.skin_reset_done),
-                    Toast.LENGTH_SHORT
-                ).show()
+                Toast.makeText(this@MainActivity, R.string.skin_reset_done, Toast.LENGTH_SHORT).show()
                 updateUI()
             }
         }
     }
 
-    // ─── Diagnostics ───────────────────────────────────────────────────
+    // ═══════════════════════════════════════════════════════════════════
+    // AlertDialog (semi-auto: wrapContext)
+    // ═══════════════════════════════════════════════════════════════════
 
-    /**
-     * Toggle the diagnostics panel visibility and refresh its content.
-     */
+    private fun showSkinnedAlertDialog() {
+        val ctx = ArsSkinEngine.wrapContext(this)
+        val view = LayoutInflater.from(ctx).inflate(R.layout.dialog_demo, null)
+
+        val dialog = AlertDialog.Builder(ctx)
+            .setTitle("AlertDialog (wrapContext)")
+            .setView(view)
+            .setPositiveButton("确定", null)
+            .create()
+
+        // Register skin-change listener for the dialog's lifetime
+        val skinListener = object : com.kagawagao.ars.SkinChangeListener {
+            override fun onSkinChanged(previous: SkinPackage?, current: SkinPackage?) {
+                dialog.window?.decorView?.let {
+                    ArsOverlaySkin.refresh(it)
+                }
+            }
+        }
+        ArsSkinEngine.registerSkinChangeListener(skinListener)
+        dialog.setOnDismissListener { ArsSkinEngine.unregisterSkinChangeListener(skinListener) }
+
+        dialog.show()
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // ArsPopupWindow
+    // ═══════════════════════════════════════════════════════════════════
+
+    @Suppress("DEPRECATION")
+    private fun showSkinnedPopup(anchor: View) {
+        ArsPopupWindow(this).apply {
+            contentView = LayoutInflater.from(skinContext)
+                .inflate(R.layout.popup_demo, null)
+            width = ViewGroup.LayoutParams.WRAP_CONTENT
+            height = ViewGroup.LayoutParams.WRAP_CONTENT
+            isOutsideTouchable = true
+            showAsDropDown(anchor, 0, 16)
+        }
+        // popup auto-refreshes on skin change and auto-unregisters on dismiss
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Snackbar (ArsOverlaySkin)
+    // ═══════════════════════════════════════════════════════════════════
+
+    private fun showSkinnedSnackbar(hostView: View) {
+        val snackbar = Snackbar.make(
+            hostView,
+            "Snackbar — 主题: ${ArsSkinEngine.currentThemeMode}",
+            Snackbar.LENGTH_LONG
+        ).apply {
+            setAction("关闭") {}
+            show()
+        }
+
+        // Walk content on skin change
+        val listener = ArsOverlaySkin.autoRefresh(snackbar.view)
+        snackbar.addCallback(object : Snackbar.Callback() {
+            override fun onDismissed(transientBottomBar: Snackbar?, event: Int) {
+                ArsSkinEngine.unregisterSkinChangeListener(listener)
+            }
+        })
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // RecyclerView Demo
+    // ═══════════════════════════════════════════════════════════════════
+
+    @Suppress("DEPRECATION")
+    private fun showRecyclerDemo() {
+        val rv = RecyclerView(this).apply {
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                300
+            )
+            layoutManager = LinearLayoutManager(this@MainActivity)
+            adapter = DemoRecyclerAdapter(5)
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("RecyclerView 演示")
+            .setView(rv)
+            .setPositiveButton("关闭", null)
+            .show()
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Spinner Demo (ArsSpinnerAdapter)
+    // ═══════════════════════════════════════════════════════════════════
+
+    private fun showSpinnerDemo() {
+        val items = listOf("浅色皮肤", "深色皮肤", "节日皮肤", "默认皮肤")
+        val adapter = ArrayAdapter(this, R.layout.spinner_item_demo, items)
+        val skinned = ArsSpinnerAdapter.wrap(adapter, this)
+
+        @Suppress("DEPRECATION")
+        val spinner = android.widget.Spinner(this).apply {
+            this.adapter = skinned
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("Spinner (ArsSpinnerAdapter)")
+            .setView(spinner)
+            .setPositiveButton("关闭", null)
+            .show()
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // ViewStub Demo
+    // ═══════════════════════════════════════════════════════════════════
+
+    private fun inflateViewStub() {
+        if (viewStubInflated) {
+            Toast.makeText(this, "ViewStub 已展开", Toast.LENGTH_SHORT).show()
+            return
+        }
+        viewStubInflated = true
+        viewStub.inflate()
+        // inflated views are automatically registered for skin updates
+        Toast.makeText(this, "ViewStub 已展开，自动注册换肤", Toast.LENGTH_SHORT).show()
+
+        // Refresh live preview area to include the new View
+        refreshSkin()
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Custom View Demo
+    // ═══════════════════════════════════════════════════════════════════
+
+    private fun showCustomViewDemo() {
+        val customView = DemoCustomView(this).apply {
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                200
+            )
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("自定义 View (DemoCustomView)")
+            .setView(customView)
+            .setPositiveButton("关闭", null)
+            .show()
+        // DemoCustomView registers its own SkinChangeListener
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Dynamic View Demo
+    // ═══════════════════════════════════════════════════════════════════
+
+    private fun addDynamicView() {
+        val ctx = ArsSkinEngine.wrapContext(this)
+
+        // Create a dynamically styled card
+        val card = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(32, 24, 32, 24)
+            background = android.graphics.drawable.ColorDrawable(
+                ctx.resources.getColor(R.color.theme_card, null)
+            )
+            layoutParams = ViewGroup.MarginLayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = 16 }
+        }
+
+        card.addView(TextView(ctx).apply {
+            text = "动态添加的 View #${livePreview.childCount}"
+            setTextColor(ctx.resources.getColor(R.color.theme_text, null))
+            textSize = 14f
+            setPadding(0, 0, 0, 8)
+        })
+
+        card.addView(ProgressBar(ctx, null, android.R.attr.progressBarStyleHorizontal).apply {
+            progress = (Math.random() * 100).toInt()
+            progressTintList = ctx.resources.getColorStateList(R.color.theme_accent, null)
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 6
+            )
+        })
+
+        livePreview.addView(card)
+        Toast.makeText(this, "已添加动态 View — 调用 refreshSkin() 可在切换后刷新", Toast.LENGTH_SHORT).show()
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Diagnostics
+    // ═══════════════════════════════════════════════════════════════════
+
     private fun toggleDiagnostics() {
-        if (svDiagnostics.visibility == View.GONE) {
+        if (tvDiagnostics.visibility == View.GONE) {
             refreshDiagnostics()
-            svDiagnostics.visibility = View.VISIBLE
+            tvDiagnostics.visibility = View.VISIBLE
             btnDiagnostics.text = "隐藏诊断"
         } else {
-            svDiagnostics.visibility = View.GONE
+            tvDiagnostics.visibility = View.GONE
             btnDiagnostics.text = getString(R.string.btn_diagnostics)
         }
     }
 
-    /**
-     * Populate the diagnostics panel with engine state.
-     */
     private fun refreshDiagnostics() {
         val diag = ArsSkinEngine.getDiagnostics()
-        val text = buildString {
-            appendLine("═══ ARS Engine Diagnostics ═══")
-            appendLine()
-            appendLine("Active Skin: ${diag.activeSkinName ?: "(default)"}")
-            appendLine("Skin Package: ${diag.activeSkinPackage ?: "N/A"}")
-            appendLine("Skin Version: ${if (diag.activeSkinVersion >= 0) diag.activeSkinVersion else "N/A"}")
-            appendLine("Theme Mode:  ${diag.themeMode}")
-            appendLine()
-            appendLine("Registered Views: ${diag.registeredViewCount}")
-            appendLine("Alive Views:      ${diag.aliveViewCount}")
-            appendLine("Listeners:        ${diag.listenerCount}")
-            appendLine("Custom Handlers:  ${diag.registeredAttributeCount}")
-            appendLine("Cached Mappings:  ${diag.cachedIdMappings}")
-            appendLine("Last Switch:      ${if (diag.lastSwitchDurationMs >= 0) "${diag.lastSwitchDurationMs}ms" else "N/A"}")
-            if (diag.lastError != null) {
-                appendLine("Last Error:       ${diag.lastError!!.message}")
-            }
+        tvDiagnostics.text = buildString {
+            appendLine("═══ ARS Engine ═══")
+            appendLine("Skin:   ${diag.activeSkinName ?: "(default)"}")
+            appendLine("Pkg:    ${diag.activeSkinPackage ?: "N/A"}")
+            appendLine("Theme:  ${diag.themeMode}")
+            appendLine("Views:  ${diag.registeredViewCount} reg / ${diag.aliveViewCount} alive")
+            appendLine("Listen: ${diag.listenerCount}")
+            appendLine("Cache:  ${diag.cachedIdMappings}")
+            appendLine("Last:   ${if (diag.lastSwitchDurationMs >= 0) "${diag.lastSwitchDurationMs}ms" else "N/A"}")
+            if (diag.lastError != null) appendLine("Error:  ${diag.lastError!!.message}")
         }
-        tvDiagnostics.text = text
     }
 
-    // ─── UI Update ─────────────────────────────────────────────────────
+    // ═══════════════════════════════════════════════════════════════════
+    // UI Update
+    // ═══════════════════════════════════════════════════════════════════
 
-    /**
-     * Refresh all UI elements to reflect the current engine state.
-     */
     private fun updateUI() {
-        val currentMode = ArsSkinEngine.currentThemeMode
-        val modeName = when (currentMode) {
+        val mode = ArsSkinEngine.currentThemeMode
+        val modeName = when (mode) {
             SkinPackage.ThemeMode.LIGHT -> "浅色 ☀️"
             SkinPackage.ThemeMode.DARK -> "深色 🌙"
         }
-
         tvCurrentTheme.text = getString(R.string.current_theme, modeName)
-
-        btnSwitchTheme.text = when (currentMode) {
+        btnSwitchTheme.text = when (mode) {
             SkinPackage.ThemeMode.LIGHT -> getString(R.string.switch_to_dark)
             SkinPackage.ThemeMode.DARK -> getString(R.string.switch_to_light)
         }
-
-        val activeSkin = ArsSkinEngine.activeSkin
-        tvSkinStatus.text = if (activeSkin != null) {
-            getString(R.string.skin_status, "${activeSkin.name} (v${activeSkin.version})")
-        } else {
-            getString(R.string.skin_status, getString(R.string.no_skin_active))
-        }
-
-        if (svDiagnostics.visibility == View.VISIBLE) {
-            refreshDiagnostics()
-        }
+        val skin = ArsSkinEngine.activeSkin
+        tvSkinStatus.text = getString(R.string.skin_status,
+            skin?.let { "${it.name} v${it.version}" } ?: getString(R.string.no_skin_active))
+        if (tvDiagnostics.visibility == View.VISIBLE) refreshDiagnostics()
     }
 
-    // ─── Skin Change Callback ──────────────────────────────────────────
-
-    /**
-     * Called after the engine has applied skin changes to all Views.
-     * Update any non-View UI state here.
-     */
     override fun onSkinApplied(previous: SkinPackage?, current: SkinPackage?) {
         updateUI()
     }

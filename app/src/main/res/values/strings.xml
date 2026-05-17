@@ -1,17 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">ARS Demo</string>
+    <string name="app_title">ARS V2 换肤演示</string>
     <string name="load_skin">加载皮肤</string>
     <string name="reset_skin">重置皮肤</string>
-    <string name="switch_to_dark">切换到深色模式</string>
-    <string name="switch_to_light">切换到浅色模式</string>
-    <string name="theme_demo">ARS V2 换肤演示</string>
+    <string name="switch_to_dark">切换到深色</string>
+    <string name="switch_to_light">切换到浅色</string>
     <string name="current_theme">当前主题: %s</string>
     <string name="skin_status">皮肤: %s</string>
     <string name="no_skin_active">默认（无皮肤）</string>
-    <string name="skin_loaded">已加载皮肤: %s</string>
+    <string name="skin_loaded">已加载: %s</string>
     <string name="skin_load_failed">加载失败: %s</string>
-    <string name="skin_reset_done">已重置为默认皮肤</string>
-    <string name="skin_switch_prompt">输入皮肤 APK 路径</string>
-    <string name="diagnostics_title">引擎诊断信息</string>
-    <string name="btn_diagnostics">显示诊断</string>
+    <string name="skin_reset_done">已重置为默认</string>
+    <string name="skin_switch_prompt">皮肤 APK 路径</string>
+    <string name="btn_diagnostics">引擎诊断</string>
 </resources>

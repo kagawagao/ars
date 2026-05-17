@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@color/theme_card"
+    android:padding="16dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Popup 菜单"
+        android:textColor="@color/theme_text"
+        android:textSize="16sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/popupItem1"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="选项 A — 皮肤配色"
+        android:textColor="@color/theme_accent"
+        android:textSize="14sp"
+        android:paddingTop="8dp" />
+
+    <TextView
+        android:id="@+id/popupItem2"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="选项 B — 引用资源"
+        android:textColor="@color/theme_text"
+        android:textSize="14sp"
+        android:paddingTop="6dp" />
+
+    <TextView
+        android:id="@+id/popupItem3"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="选项 C — 随皮肤变化"
+        android:textColor="@color/theme_text"
+        android:textSize="14sp"
+        android:paddingTop="6dp" />
+
+</LinearLayout>

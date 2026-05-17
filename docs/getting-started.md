@@ -231,38 +231,68 @@ ArsSkinEngine.registerSkinChangeListener { previous, current ->
 
 ---
 
-## 6. 各种 UI 模式支持
+## 6. 全部 UI 模式支持
 
-ARS 覆盖 Android 常见的全部 UI 呈现模式。
+ARS 覆盖 Android 全部 UI 呈现模式。**17 种自动 + 4 种半自动 + 明确的不支持说明**：
 
 | 类别 | 模式 | 支持方式 |
 |------|------|----------|
-| 🟢 自动 | Activity / Fragment / DialogFragment | 继承对应基类即可 |
-| 🟢 自动 | BottomSheet / RecyclerView / ViewPager / ViewStub | 自动，无需额外代码 |
-| 🟢 自动 | DataBinding / ViewBinding / 自定义View | 自动，使用宿主 Context |
-| 🟡 半自动 | AlertDialog / PopupWindow / 手动Dialog | 需 `wrapContext()` |
-| 🔴 不支持 | Toast / Notification / Widget / Compose | 独立进程/渲染管线 |
+| 🟢 自动 | Activity / Fragment / DialogFragment / BottomSheet | 继承对应基类 |
+| 🟢 自动 | Dialog / AlertDialog / PopupWindow | `ArsDialog` / `ArsPopupWindow` |
+| 🟢 自动 | Snackbar | `ArsOverlaySkin.autoRefresh()` |
+| 🟢 自动 | RecyclerView / ViewPager / ViewStub / `<include>` / DataBinding / ViewBinding / 自定义View | 零配置自动 |
+| 🟡 半自动 | Toast / Spinner下拉 / 动态添加View | 一行包装代码 |
+| 🔴 不支持 | Notification / AppWidget / WebView / SurfaceView / Compose | 独立进程/渲染管线，含替代方案 |
 
-**详见：[全部 UI 模式支持矩阵](docs/ui-patterns.md)** — 包含每种模式的完整代码示例、RecyclerView 注意事项、自定义 View 开发指南。
+**详见：[全部 UI 模式支持矩阵](docs/ui-patterns.md)** — 24 种模式完整代码示例、快速决策指南。
 
 ### AlertDialog
 
 ```kotlin
+// 方式一：ArsDialog（推荐）
+class MyDialog(context: Context) : ArsDialog(context) {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.dialog_my)
+    }
+}
+
+// 方式二：wrapContext
 val ctx = ArsSkinEngine.wrapContext(requireContext())
 val view = LayoutInflater.from(ctx).inflate(R.layout.dialog_content, null)
-AlertDialog.Builder(ctx)
-    .setView(view)
-    .show()
+AlertDialog.Builder(ctx).setView(view).show()
 ```
 
 ### PopupWindow
 
 ```kotlin
-val ctx = ArsSkinEngine.wrapContext(baseContext)
-val content = LayoutInflater.from(ctx).inflate(R.layout.popup, null)
-PopupWindow(content, WRAP_CONTENT, WRAP_CONTENT).apply {
-    showAtLocation(anchor, Gravity.CENTER, 0, 0)
+// 方式一：ArsPopupWindow（推荐，自动刷新）
+val popup = ArsPopupWindow(requireContext()).apply {
+    contentView = LayoutInflater.from(skinContext).inflate(R.layout.popup_menu, null)
+    showAsDropDown(anchor)
 }
+```
+
+### Snackbar
+
+```kotlin
+val snackbar = Snackbar.make(view, "消息", Snackbar.LENGTH_SHORT).apply { show() }
+// 皮肤切换后手动刷新 Snackbar 内容
+val listener = ArsOverlaySkin.autoRefresh(snackbar.view)
+// dismiss 时记得: ArsSkinEngine.unregisterSkinChangeListener(listener)
+```
+
+### Toast
+
+```kotlin
+ArsToast.showText(this, "操作成功", Toast.LENGTH_SHORT)
+```
+
+### Spinner 下拉
+
+```kotlin
+val adapter = ArrayAdapter(this, R.layout.spinner_item, items)
+spinner.adapter = ArsSpinnerAdapter.wrap(adapter, this)
 ```
 
 ### 动态添加 View
@@ -271,10 +301,7 @@ PopupWindow(content, WRAP_CONTENT, WRAP_CONTENT).apply {
 val ctx = ArsSkinEngine.wrapContext(this)
 val button = Button(ctx)  // 资源查询自动使用皮肤
 parentLayout.addView(button)
-
-// 如果 active skin 存在，新 View 在 inflate 时即被换肤
-// 如果之后切换皮肤，调用 refreshSkin()
-refreshSkin()
+refreshSkin()  // 如果之后切换了皮肤
 ```
 
 ---
@@ -312,6 +339,11 @@ ars-core/
 ├── ArsActivity.kt         ← 继承此类
 ├── ArsFragment.kt         ← 继承此类
 ├── ArsDialogFragment.kt   ← DialogFragment 继承此类
+├── ArsDialog.kt           ← 手动 Dialog 继承此类
+├── ArsPopupWindow.kt      ← PopupWindow 继承此类
+├── ArsToast.kt            ← Toast 换肤工具
+├── ArsSnackbar.kt         ← Snackbar/Overlay 换肤工具
+├── ArsSpinnerAdapter.kt   ← Spinner 下拉换肤适配器
 ├── ArsSkinEngine.kt       ← 核心引擎（单例）
 ├── SkinPackage.kt         ← 皮肤包数据类
 ├── SkinResult.kt          ← 操作结果包装

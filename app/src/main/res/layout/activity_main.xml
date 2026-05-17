@@ -1,110 +1,251 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
+<!-- ARS V2 Demo — 24 UI Pattern Showcase -->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/rootScroll"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/theme_background"
-    tools:context=".MainActivity">
+    android:background="@color/theme_background">
 
-    <TextView
-        android:id="@+id/tvTitle"
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="@string/theme_demo"
-        android:textColor="@color/theme_text"
-        android:textSize="24sp"
-        android:textStyle="bold"
-        android:layout_marginTop="48dp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        android:orientation="vertical"
+        android:padding="16dp">
 
-    <TextView
-        android:id="@+id/tvCurrentTheme"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/current_theme"
-        android:textColor="@color/theme_text"
-        android:textSize="16sp"
-        android:layout_marginTop="24dp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/tvTitle" />
+        <!-- ═══════════ HEADER ═══════════ -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/app_title"
+            android:textColor="@color/theme_text"
+            android:textSize="28sp"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:paddingBottom="4dp" />
 
-    <TextView
-        android:id="@+id/tvSkinStatus"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/skin_status"
-        android:textColor="@color/theme_text"
-        android:textSize="14sp"
-        android:layout_marginTop="12dp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/tvCurrentTheme" />
+        <TextView
+            android:id="@+id/tvCurrentTheme"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@color/theme_text"
+            android:textSize="16sp"
+            android:gravity="center"
+            android:paddingBottom="2dp" />
 
-    <Button
-        android:id="@+id/btnSwitchTheme"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/switch_to_dark"
-        android:layout_marginTop="32dp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/tvSkinStatus" />
+        <TextView
+            android:id="@+id/tvSkinStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@color/theme_text"
+            android:textSize="14sp"
+            android:gravity="center"
+            android:paddingBottom="16dp" />
 
-    <Button
-        android:id="@+id/btnLoadSkin"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/load_skin"
-        android:layout_marginTop="16dp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/btnSwitchTheme" />
+        <!-- ═══════════ CONTROLS ═══════════ -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center">
 
-    <Button
-        android:id="@+id/btnResetSkin"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/reset_skin"
-        android:layout_marginTop="16dp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/btnLoadSkin" />
+            <Button
+                android:id="@+id/btnSwitchTheme"
+                style="@style/DemoButton"
+                android:text="@string/switch_to_dark" />
 
-    <Button
-        android:id="@+id/btnDiagnostics"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/btn_diagnostics"
-        android:layout_marginTop="16dp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/btnResetSkin" />
+            <Button
+                android:id="@+id/btnLoadSkin"
+                style="@style/DemoButton"
+                android:text="@string/load_skin" />
+        </LinearLayout>
 
-    <ScrollView
-        android:id="@+id/svDiagnostics"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:layout_marginTop="24dp"
-        android:layout_marginHorizontal="16dp"
-        android:layout_marginBottom="16dp"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/btnDiagnostics"
-        android:visibility="gone">
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center">
 
+            <Button
+                android:id="@+id/btnResetSkin"
+                style="@style/DemoButton"
+                android:text="@string/reset_skin" />
+
+            <Button
+                android:id="@+id/btnDiagnostics"
+                style="@style/DemoButton"
+                android:text="@string/btn_diagnostics" />
+        </LinearLayout>
+
+        <!-- Diagnostics Panel -->
         <TextView
             android:id="@+id/tvDiagnostics"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:textColor="@color/theme_text"
-            android:textSize="12sp"
+            android:textSize="11sp"
             android:fontFamily="monospace"
-            android:padding="12dp" />
-    </ScrollView>
+            android:padding="10dp"
+            android:layout_marginTop="8dp"
+            android:background="@color/theme_card"
+            android:visibility="gone" />
 
-</androidx.constraintlayout.widget.ConstraintLayout>
+        <!-- ═══════════ SECTION: Core Patterns ═══════════ -->
+        <TextView
+            style="@style/SectionHeader"
+            android:text="🟢 核心模式" />
+
+        <Button
+            android:id="@+id/btnFragment"
+            style="@style/PatternButton"
+            android:text="Fragment (ArsFragment)" />
+
+        <Button
+            android:id="@+id/btnDialogFragment"
+            style="@style/PatternButton"
+            android:text="DialogFragment (ArsDialogFragment)" />
+
+        <Button
+            android:id="@+id/btnBottomSheet"
+            style="@style/PatternButton"
+            android:text="BottomSheetDialogFragment" />
+
+        <Button
+            android:id="@+id/btnArsDialog"
+            style="@style/PatternButton"
+            android:text="Dialog (ArsDialog)" />
+
+        <Button
+            android:id="@+id/btnAlertDialog"
+            style="@style/PatternButton"
+            android:text="AlertDialog" />
+
+        <!-- ═══════════ SECTION: Overlay Patterns ═══════════ -->
+        <TextView
+            style="@style/SectionHeader"
+            android:text="🟢 覆盖层模式" />
+
+        <Button
+            android:id="@+id/btnPopupWindow"
+            style="@style/PatternButton"
+            android:text="PopupWindow (ArsPopupWindow)" />
+
+        <Button
+            android:id="@+id/btnSnackbar"
+            style="@style/PatternButton"
+            android:text="Snackbar (ArsOverlaySkin)" />
+
+        <Button
+            android:id="@+id/btnToast"
+            style="@style/PatternButton"
+            android:text="Toast (ArsToast)" />
+
+        <!-- ═══════════ SECTION: List Patterns ═══════════ -->
+        <TextView
+            style="@style/SectionHeader"
+            android:text="🟢 列表模式" />
+
+        <Button
+            android:id="@+id/btnRecyclerView"
+            style="@style/PatternButton"
+            android:text="RecyclerView (自动换肤)" />
+
+        <Button
+            android:id="@+id/btnSpinner"
+            style="@style/PatternButton"
+            android:text="Spinner 下拉 (ArsSpinnerAdapter)" />
+
+        <!-- ═══════════ SECTION: Special Patterns ═══════════ -->
+        <TextView
+            style="@style/SectionHeader"
+            android:text="🟢 特殊模式" />
+
+        <Button
+            android:id="@+id/btnViewStub"
+            style="@style/PatternButton"
+            android:text="ViewStub (延迟 inflate)" />
+
+        <!-- ViewStub: initially invisible, inflated on button click -->
+        <ViewStub
+            android:id="@+id/viewStub"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:layout="@layout/viewstub_content" />
+
+        <Button
+            android:id="@+id/btnCustomView"
+            style="@style/PatternButton"
+            android:text="自定义 View (代码)" />
+
+        <Button
+            android:id="@+id/btnDynamicView"
+            style="@style/PatternButton"
+            android:text="动态添加 View" />
+
+        <!-- ═══════════ Live Preview Area ═══════════ -->
+        <TextView
+            style="@style/SectionHeader"
+            android:text="📱 实时预览区" />
+
+        <LinearLayout
+            android:id="@+id/livePreview"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@color/theme_card"
+            android:padding="12dp"
+            android:layout_marginTop="4dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="以下 View 实时响应皮肤切换"
+                android:textColor="@color/theme_text"
+                android:textSize="12sp"
+                android:paddingBottom="8dp"
+                android:gravity="center" />
+
+            <TextView
+                android:id="@+id/previewText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="文字示例 Text Sample"
+                android:textColor="@color/theme_text"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:gravity="center"
+                android:paddingBottom="8dp" />
+
+            <ImageView
+                android:id="@+id/previewImage"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_launcher_foreground"
+                android:tint="@color/theme_text" />
+
+            <ProgressBar
+                android:id="@+id/previewProgress"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="8dp"
+                android:layout_marginTop="8dp"
+                android:progress="60"
+                android:progressTint="@color/theme_text" />
+
+            <CheckBox
+                android:id="@+id/previewCheckbox"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:text="选中我 Toggle me"
+                android:textColor="@color/theme_text"
+                android:buttonTint="@color/theme_text"
+                android:checked="true" />
+        </LinearLayout>
+
+        <!-- ═══════════ SECTION: Bottom Space ═══════════ -->
+        <View android:layout_width="match_parent" android:layout_height="64dp" />
+
+    </LinearLayout>
+</ScrollView>
