@@ -60,22 +60,22 @@ open class ArsActivity : AppCompatActivity(), SkinChangeListener {
     /**
      * Initialize skinning support.
      *
-     * 1. Installs [SkinLayoutInflater] as the LayoutInflater's Factory2,
-     *    chaining with AppCompat's existing Factory2 for View substitution.
+     * 1. Installs [SkinLayoutInflater] as the LayoutInflater's Factory2
+     *    BEFORE super.onCreate() so AppCompat chains on top of it.
      * 2. Registers this Activity as a global skin change listener.
      */
     @CallSuper
     override fun onCreate(savedInstanceState: Bundle?) {
-        // Install SkinLayoutInflater BEFORE super.onCreate() so AppCompat
-        // can set up its own Factory2 chain first
-        super.onCreate(savedInstanceState)
-
-        // Now install our SkinLayoutInflater, chaining with whatever
-        // Factory2 AppCompat installed during super.onCreate()
+        // Install SkinLayoutInflater BEFORE super.onCreate().
+        // AppCompat sets its own Factory2 during super.onCreate() —
+        // we must be first so AppCompat wraps ours rather than
+        // trying to replace AppCompat's (which throws "factory already set").
         val inflater = LayoutInflater.from(this)
         val originalFactory = inflater.factory2
         val skinFactory = ArsSkinEngine.createSkinFactory(originalFactory, this)
         inflater.factory2 = skinFactory
+
+        super.onCreate(savedInstanceState)
 
         // Register for skin change notifications
         ArsSkinEngine.registerSkinChangeListener(this)
