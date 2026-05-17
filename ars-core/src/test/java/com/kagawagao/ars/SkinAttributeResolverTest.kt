@@ -61,7 +61,6 @@ class SkinAttributeResolverTest {
         assertTrue(SkinAttributeResolver.isSupported("tint"))
         assertTrue(SkinAttributeResolver.isSupported("progressTint"))
         assertTrue(SkinAttributeResolver.isSupported("thumbTint"))
-        assertTrue(SkinAttributeResolver.isSupported("trackTint"))
         assertTrue(SkinAttributeResolver.isSupported("buttonTint"))
         assertTrue(SkinAttributeResolver.isSupported("drawableStart"))
         assertTrue(SkinAttributeResolver.isSupported("drawableEnd"))

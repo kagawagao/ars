@@ -36,7 +36,6 @@ internal object SkinAttributeResolver {
         "tint",
         "progressTint",
         "thumbTint",
-        "trackTint",
         "buttonTint",
         "drawableStart",
         "drawableEnd",
@@ -128,7 +127,6 @@ internal object SkinAttributeResolver {
             "tint" -> return ResourceType.COLOR_STATE_LIST
             "progressTint" -> return ResourceType.COLOR_STATE_LIST
             "thumbTint" -> return ResourceType.COLOR_STATE_LIST
-            "trackTint" -> return ResourceType.COLOR_STATE_LIST
             "buttonTint" -> return ResourceType.COLOR_STATE_LIST
             "textSize" -> return ResourceType.DIMENSION
             "src" -> return ResourceType.DRAWABLE
