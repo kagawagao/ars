@@ -1,0 +1,182 @@
+package com.kagawagao.ars.internal
+
+import android.content.Context
+import android.content.pm.PackageManager
+import android.content.res.Resources
+import android.os.Build
+import androidx.annotation.RequiresApi
+import com.kagawagao.ars.SkinError
+import com.kagawagao.ars.SkinPackage
+import com.kagawagao.ars.SkinResult
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.io.File
+
+/**
+ * Loads and validates skin APK packages.
+ *
+ * Internal class used by [ArsSkinEngine]. Handles APK validation,
+ * ARS metadata extraction, and Resources creation for skin packages.
+ *
+ * @param context The host application context (used for PackageManager access).
+ */
+@RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+internal class ArsSkinLoader(private val context: Context) {
+
+    companion object {
+        /** The ARS skin format version that this loader supports. */
+        const val FRAMEWORK_VERSION = 1
+
+        // ARS metadata keys in AndroidManifest.xml
+        private const val META_SKIN_NAME = "ars-skin-name"
+        private const val META_SKIN_VERSION = "ars-skin-version"
+        private const val META_TARGET_PACKAGE = "ars-target-package"
+    }
+
+    /**
+     * Load a skin package from a file path.
+     *
+     * Performs I/O on [Dispatchers.IO]. Validates the APK structure,
+     * verifies ARS metadata, checks target compatibility, and creates
+     * a [Resources] instance for the skin.
+     *
+     * @param skinPath Absolute path to the skin APK file.
+     * @return [SkinResult.Success] with a [SkinPackage] on success,
+     *         [SkinResult.Error] with a [SkinError] on failure.
+     */
+    suspend fun load(skinPath: String): SkinResult<SkinPackage> = withContext(Dispatchers.IO) {
+        try {
+            // Step 1: Validate file exists
+            val skinFile = File(skinPath)
+            if (!skinFile.exists() || !skinFile.isFile) {
+                return@withContext SkinResult.Error(SkinError.FileNotFound(skinPath))
+            }
+
+            if (!skinFile.canRead()) {
+                return@withContext SkinResult.Error(SkinError.StorageError("Cannot read skin file: $skinPath"))
+            }
+
+            // Step 2: Parse via PackageManager
+            val packageManager = context.packageManager
+            val packageInfo = try {
+                packageManager.getPackageArchiveInfo(
+                    skinPath,
+                    PackageManager.GET_META_DATA or PackageManager.GET_ACTIVITIES
+                )
+            } catch (e: Exception) {
+                return@withContext SkinResult.Error(SkinError.CorruptedPackage(skinPath, e))
+            }
+
+            if (packageInfo == null) {
+                return@withContext SkinResult.Error(SkinError.CorruptedPackage(skinPath))
+            }
+
+            // Step 3: Verify ARS metadata
+            val appInfo = packageInfo.applicationInfo
+                ?: return@withContext SkinResult.Error(SkinError.CorruptedPackage(skinPath))
+
+            val metaData = appInfo.metaData
+            if (metaData == null) {
+                return@withContext SkinResult.Error(
+                    SkinError.NotASkinPackage(packageInfo.packageName)
+                )
+            }
+
+            val skinName = metaData.getString(META_SKIN_NAME)
+            val skinVersion = metaData.getInt(META_SKIN_VERSION, -1)
+            val targetPackage = metaData.getString(META_TARGET_PACKAGE)
+
+            // Validate required metadata
+            if (skinName.isNullOrBlank()) {
+                return@withContext SkinResult.Error(
+                    SkinError.NotASkinPackage(packageInfo.packageName)
+                )
+            }
+
+            if (skinVersion < 0) {
+                return@withContext SkinResult.Error(
+                    SkinError.NotASkinPackage(packageInfo.packageName)
+                )
+            }
+
+            if (targetPackage.isNullOrBlank()) {
+                return@withContext SkinResult.Error(
+                    SkinError.NotASkinPackage(packageInfo.packageName)
+                )
+            }
+
+            // Step 4: Verify target package matches host
+            val hostPackage = context.packageName
+            if (targetPackage != hostPackage) {
+                return@withContext SkinResult.Error(
+                    SkinError.TargetMismatch(targetPackage, hostPackage)
+                )
+            }
+
+            // Step 5: Check version compatibility
+            if (skinVersion != FRAMEWORK_VERSION) {
+                return@withContext SkinResult.Error(
+                    SkinError.IncompatibleVersion(skinVersion, FRAMEWORK_VERSION)
+                )
+            }
+
+            // Step 6: Create Resources for the skin APK
+            val skinResources = try {
+                createResourcesForPackage(packageInfo, skinPath, packageManager)
+            } catch (e: Exception) {
+                return@withContext SkinResult.Error(SkinError.StorageError(
+                    "Failed to create Resources for skin package: ${e.message}", e
+                ))
+            }
+
+            // Step 7: Sync configuration with host
+            skinResources.updateConfiguration(
+                context.resources.configuration,
+                context.resources.displayMetrics
+            )
+
+            // Step 8: Build SkinPackage
+            val skinPackage = SkinPackage(
+                name = skinName,
+                packageName = packageInfo.packageName,
+                targetPackage = targetPackage,
+                version = skinVersion,
+                resources = skinResources,
+                path = skinPath,
+                themeHint = null
+            )
+
+            SkinResult.Success(skinPackage)
+        } catch (e: Exception) {
+            SkinResult.Error(SkinError.StorageError(
+                "Unexpected error loading skin: ${e.message}", e
+            ))
+        }
+    }
+
+    /**
+     * Create a [Resources] instance for a skin APK using
+     * [PackageManager.getResourcesForApplication].
+     *
+     * This is the standard, non-reflective way to obtain Resources for
+     * an external APK. The resulting Resources is used by [SkinResources]
+     * as the overlay source — it is NOT used directly by Views.
+     *
+     * @param packageInfo The parsed package archive info.
+     * @param skinPath The file path to the skin APK.
+     * @param packageManager The host's PackageManager instance.
+     * @return A Resources instance for the skin APK.
+     */
+    @Suppress("DEPRECATION")
+    private fun createResourcesForPackage(
+        packageInfo: android.content.pm.PackageInfo,
+        skinPath: String,
+        packageManager: PackageManager
+    ): Resources {
+        val appInfo = packageInfo.applicationInfo!!.apply {
+            sourceDir = skinPath
+            publicSourceDir = skinPath
+        }
+        return packageManager.getResourcesForApplication(appInfo)
+    }
+}

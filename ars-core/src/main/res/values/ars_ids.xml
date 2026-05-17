@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        Tag ID for Views that should be excluded from automatic skinning.
+
+        Usage in layout XML:
+        <View
+            android:id="@+id/ars_skip_skinning"
+            android:tag="true"
+            ... />
+
+        Or programmatically:
+        view.setTag(R.id.ars_skip_skinning, true)
+    -->
+    <item name="ars_skip_skinning" type="id"/>
+</resources>

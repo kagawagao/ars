@@ -1,58 +1,167 @@
 package com.kagawagao.ars
 
+import android.content.Context
 import android.os.Build
 import android.os.Bundle
+import android.view.LayoutInflater
+import androidx.annotation.CallSuper
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
+import com.kagawagao.ars.internal.ArsViewTreeWalker
 
 /**
- * ARS Activity 基类
- * 
- * 提供自动换肤支持的 Activity
- * 继承此类的 Activity 会自动响应主题切换
+ * Base Activity for ARS-skinning-enabled applications.
+ *
+ * Extend this instead of [AppCompatActivity]. Provides automatic View skinning,
+ * skin switch handling, and transient state preservation — with **zero**
+ * additional developer intervention beyond changing the parent class.
+ *
+ * ## Key behaviors (FR-P0-03, FR-P0-04, FR-P0-07):
+ *
+ * - **Context wrapping** in [attachBaseContext]: all `getResources()` calls
+ *   on the Activity Context return skin-aware values.
+ * - **LayoutInflater interception** in [onCreate]: all XML-inflated Views
+ *   are automatically registered for skin updates via [SkinLayoutInflater].
+ * - **No recreation** on skin switch: [onSkinChanged] walks the View tree
+ *   in-place, preserving scroll position, text input, etc.
+ * - **State preservation**: [onSaveInstanceState] / [onRestoreInstanceState]
+ *   are overridden for proper lifecycle handling.
+ *
+ * ## Usage
+ *
+ * ```kotlin
+ * class MainActivity : ArsActivity() {
+ *     override fun onCreate(savedInstanceState: Bundle?) {
+ *         super.onCreate(savedInstanceState)
+ *         setContentView(R.layout.main)
+ *     }
+ * }
+ * ```
  */
-@RequiresApi(34)
-open class ArsActivity : AppCompatActivity(), ArsSkinManager.ThemeChangeListener {
-    
-    private lateinit var skinManager: ArsSkinManager
-    
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        skinManager = ArsSkinManager.getInstance(this)
-        skinManager.registerThemeChangeListener(this)
+@RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+open class ArsActivity : AppCompatActivity(), SkinChangeListener {
+
+    // ─── Context Wrapping ─────────────────────────────────────────────
+
+    /**
+     * Wrap the base Context with skin-aware [SkinResources].
+     *
+     * This is called by the framework before [onCreate]. After this,
+     * `this.resources.getColor(R.color.primary)` returns the skin's
+     * color when a skin is active.
+     */
+    override fun attachBaseContext(newBase: Context) {
+        val wrapped = ArsSkinEngine.wrapContext(newBase)
+        super.attachBaseContext(wrapped)
     }
-    
+
+    // ─── Lifecycle ────────────────────────────────────────────────────
+
+    /**
+     * Initialize skinning support.
+     *
+     * 1. Installs [SkinLayoutInflater] as the LayoutInflater's Factory2,
+     *    chaining with AppCompat's existing Factory2 for View substitution.
+     * 2. Registers this Activity as a global skin change listener.
+     */
+    @CallSuper
+    override fun onCreate(savedInstanceState: Bundle?) {
+        // Install SkinLayoutInflater BEFORE super.onCreate() so AppCompat
+        // can set up its own Factory2 chain first
+        super.onCreate(savedInstanceState)
+
+        // Now install our SkinLayoutInflater, chaining with whatever
+        // Factory2 AppCompat installed during super.onCreate()
+        val inflater = LayoutInflater.from(this)
+        val originalFactory = inflater.factory2
+        val skinFactory = ArsSkinEngine.createSkinFactory(originalFactory, this)
+        inflater.factory2 = skinFactory
+
+        // Register for skin change notifications
+        ArsSkinEngine.registerSkinChangeListener(this)
+    }
+
+    @CallSuper
     override fun onDestroy() {
         super.onDestroy()
-        skinManager.unregisterThemeChangeListener(this)
+        ArsSkinEngine.unregisterSkinChangeListener(this)
     }
-    
-    override fun onThemeChanged(mode: ArsSkinManager.ThemeMode) {
-        // 主题改变时重建 Activity
-        // 注意：调用 recreate() 会导致 Activity 完全重建，可能造成状态丢失
-        // 建议在调用前保存状态（通过 onSaveInstanceState）
-        // 或考虑实现更细粒度的视图刷新机制
-        recreate()
-    }
-    
+
+    // ─── State Preservation (FR-P0-04) ────────────────────────────────
+
     /**
-     * 加载皮肤包
+     * Save Activity instance state.
+     *
+     * Overridden to ensure proper state preservation when the system
+     * kills and restores this Activity (e.g., during configuration changes
+     * coinciding with a skin switch).
      */
-    protected fun loadSkin(skinPath: String): Boolean {
-        return skinManager.loadSkin(skinPath)
+    @CallSuper
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
     }
-    
+
     /**
-     * 重置为默认皮肤
+     * Restore Activity instance state.
+     *
+     * Overridden to ensure proper state restoration after system-initiated
+     * process death.
      */
-    protected fun resetSkin() {
-        skinManager.resetToDefault()
+    @CallSuper
+    override fun onRestoreInstanceState(savedInstanceState: Bundle) {
+        super.onRestoreInstanceState(savedInstanceState)
     }
-    
+
+    // ─── Skin Change Handling (FR-P0-03) ──────────────────────────────
+
     /**
-     * 切换主题模式
+     * Called after the active skin has changed.
+     *
+     * Walks the View tree starting from [android.view.Window.getDecorView]
+     * and applies the new skin to all registered Views — without recreating
+     * the Activity. Scroll position, text input, and other transient state
+     * are preserved.
+     *
+     * Override this to perform custom post-skin-switch logic.
+     *
+     * @param previous The previously active skin, or `null` if default was active.
+     * @param current The newly active skin, or `null` if reset to default.
      */
-    protected fun switchTheme(mode: ArsSkinManager.ThemeMode) {
-        skinManager.switchThemeMode(mode)
+    /**
+     * Called after the active skin has changed and the View tree has been updated.
+     *
+     * Override this to perform custom post-skin-switch logic (e.g., update
+     * non-View UI elements, refresh custom components). The View tree has
+     * already been walked and updated before this is called.
+     *
+     * @param previous The previously active skin, or `null` if default was active.
+     * @param current The newly active skin, or `null` if reset to default.
+     */
+    open fun onSkinApplied(previous: SkinPackage?, current: SkinPackage?) {
+        // Subclasses override to add custom post-skin-switch behavior
+    }
+
+    /**
+     * SkinChangeListener implementation.
+     *
+     * Walks the View tree and applies the new skin, then calls [onSkinApplied]
+     * for subclass-level customization. This is `final` — override [onSkinApplied] instead.
+     */
+    final override fun onSkinChanged(previous: SkinPackage?, current: SkinPackage?) {
+        // Walk the View tree to apply the new skin
+        ArsViewTreeWalker.walk(window.decorView, ArsSkinEngine)
+        // Notify subclass
+        onSkinApplied(previous, current)
+    }
+
+    // ─── Convenience Methods ───────────────────────────────────────────
+
+    /**
+     * Re-apply the current skin to this Activity's View tree.
+     *
+     * Useful after programmatically adding Views or changing the layout.
+     */
+    fun refreshSkin() {
+        ArsViewTreeWalker.walk(window.decorView, ArsSkinEngine)
     }
 }
