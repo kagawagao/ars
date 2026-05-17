@@ -32,6 +32,18 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/tvTitle" />
 
+    <TextView
+        android:id="@+id/tvSkinStatus"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/skin_status"
+        android:textColor="@color/theme_text"
+        android:textSize="14sp"
+        android:layout_marginTop="12dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/tvCurrentTheme" />
+
     <Button
         android:id="@+id/btnSwitchTheme"
         android:layout_width="wrap_content"
@@ -40,7 +52,7 @@
         android:layout_marginTop="32dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/tvCurrentTheme" />
+        app:layout_constraintTop_toBottomOf="@id/tvSkinStatus" />
 
     <Button
         android:id="@+id/btnLoadSkin"
@@ -61,5 +73,38 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/btnLoadSkin" />
+
+    <Button
+        android:id="@+id/btnDiagnostics"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/btn_diagnostics"
+        android:layout_marginTop="16dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/btnResetSkin" />
+
+    <ScrollView
+        android:id="@+id/svDiagnostics"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_marginTop="24dp"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginBottom="16dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/btnDiagnostics"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/tvDiagnostics"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@color/theme_text"
+            android:textSize="12sp"
+            android:fontFamily="monospace"
+            android:padding="12dp" />
+    </ScrollView>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
