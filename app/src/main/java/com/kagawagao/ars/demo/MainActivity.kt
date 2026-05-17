@@ -32,6 +32,7 @@ import com.kagawagao.ars.SkinPackage
 import com.kagawagao.ars.SkinResult
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -72,6 +73,11 @@ class MainActivity : ArsActivity() {
         initViews()
         setupListeners()
         updateUI()
+    }
+
+    override fun onDestroy() {
+        scope.cancel()
+        super.onDestroy()
     }
 
     // ─── Init ─────────────────────────────────────────────────────────
@@ -202,9 +208,16 @@ class MainActivity : ArsActivity() {
 
     private fun resetSkinToDefault() {
         scope.launch {
-            resetSkin()
+            val result = resetSkin()
             withContext(Dispatchers.Main) {
-                Toast.makeText(this@MainActivity, R.string.skin_reset_done, Toast.LENGTH_SHORT).show()
+                when (result) {
+                    is SkinResult.Success ->
+                        Toast.makeText(this@MainActivity, R.string.skin_reset_done, Toast.LENGTH_SHORT).show()
+                    is SkinResult.Error ->
+                        Toast.makeText(this@MainActivity,
+                            getString(R.string.skin_load_failed, result.error.message),
+                            Toast.LENGTH_LONG).show()
+                }
                 updateUI()
             }
         }

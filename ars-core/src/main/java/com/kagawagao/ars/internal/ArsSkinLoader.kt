@@ -175,7 +175,12 @@ internal class ArsSkinLoader(private val context: Context) {
         expectedSha256: String? = null
     ): SkinResult<SkinPackage> = withContext(Dispatchers.IO) {
         try {
-            val destFile = File(context.filesDir, "skins/$skinName").apply {
+            // Sanitize skinName to prevent path traversal attacks
+            val safeName = File(skinName).name
+            require(safeName.endsWith(".apk")) {
+                "skinName must end with .apk, got: $safeName"
+            }
+            val destFile = File(context.filesDir, "skins/$safeName").apply {
                 parentFile?.mkdirs()
             }
 

@@ -52,14 +52,22 @@ open class ArsFragment : Fragment(), SkinChangeListener {
     // ─── Lifecycle ────────────────────────────────────────────────────
 
     /**
+     * Install the skin-aware LayoutInflater Factory2 via onGetLayoutInflater.
+     *
+     * This is the recommended hook — it runs before every View creation
+     * and ensures subclasses always receive a wrapped inflater.
+     */
+    override fun onGetLayoutInflater(savedInstanceState: Bundle?): LayoutInflater {
+        val inflater = super.onGetLayoutInflater(savedInstanceState).cloneInContext(requireContext())
+        wrapInflater(inflater)
+        return inflater
+    }
+
+    /**
      * Create and return the Fragment's View hierarchy.
      *
-     * Installs [SkinLayoutInflater] as the LayoutInflater's Factory2
-     * before inflating, so all Views in the Fragment's layout are
-     * automatically registered for skin updates.
-     *
-     * Override this and call `super.onCreateView()` — OR override and
-     * return your own View, then call [wrapInflater] manually.
+     * The LayoutInflater provided to this method has already been wrapped
+     * by [onGetLayoutInflater] — subclasses can use it directly.
      */
     @CallSuper
     override fun onCreateView(
@@ -67,9 +75,6 @@ open class ArsFragment : Fragment(), SkinChangeListener {
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View? {
-        // Wrap the provided inflater with our SkinLayoutInflater
-        val wrappedInflater = inflater.cloneInContext(requireContext())
-        wrapInflater(wrappedInflater)
         return null  // Subclasses override to inflate their own layout
     }
 

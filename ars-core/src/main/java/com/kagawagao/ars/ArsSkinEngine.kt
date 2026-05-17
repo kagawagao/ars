@@ -372,7 +372,10 @@ object ArsSkinEngine {
                 previousSkin = oldSkin
                 activeSkin = skin
 
-                oldSkin?.dispose()
+                // NOTE: Do NOT dispose oldSkin here — it may be restored by cancelPreview().
+                // oldSkin stays alive so that cancelPreview() can call switchSkin(oldSkin)
+                // and switchSkin() will handle disposal of the preview skin.
+
                 invalidateIdCache()
                 updateAllSkinResources(skin.resources, skin.packageName)
                 walkAllActivityTrees()
@@ -539,6 +542,10 @@ object ArsSkinEngine {
      */
     fun registerAttributeHandler(attributeName: String, handler: SkinAttributeHandler) {
         attributeHandlers[attributeName] = handler
+        // Also register in the resolver so XML-inflated Views with this
+        // attribute will have their bindings recorded (otherwise
+        // SkinLayoutInflater skips unrecognized attributes)
+        SkinAttributeResolver.registerCustom(attributeName)
     }
 
     /**
@@ -548,6 +555,7 @@ object ArsSkinEngine {
      */
     fun unregisterAttributeHandler(attributeName: String) {
         attributeHandlers.remove(attributeName)
+        SkinAttributeResolver.unregisterCustom(attributeName)
     }
 
     // ─── Diagnostics ───────────────────────────────────────────────────

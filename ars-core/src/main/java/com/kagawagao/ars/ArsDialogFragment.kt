@@ -83,6 +83,11 @@ open class ArsDialogFragment : DialogFragment(), SkinChangeListener {
         super.onAttach(wrappedContext!!)
     }
 
+    override fun onDetach() {
+        wrappedContext = null
+        super.onDetach()
+    }
+
     // ─── Dialog Creation ──────────────────────────────────────────────
 
     /**
