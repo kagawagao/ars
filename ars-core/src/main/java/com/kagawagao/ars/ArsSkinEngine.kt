@@ -746,7 +746,11 @@ object ArsSkinEngine {
      * @param meta The View's skin metadata.
      */
     internal fun applySkinToView(view: View, meta: SkinViewMeta) {
-        val skinRes = activeSkin?.resources ?: return
+        // Use the view's own context.resources, which goes through
+        // SkinContextWrapper → SkinResources → baseResources chain.
+        // This ensures theme mode changes (via updateConfiguration on
+        // baseResources) and skin changes both propagate correctly.
+        val res = view.context.resources
 
         val handlerMap = attributeHandlers
         for (binding in meta.attributes) {
@@ -754,7 +758,7 @@ object ArsSkinEngine {
                 // Try custom handler first
                 val handler = handlerMap[binding.attributeName]
                 if (handler != null) {
-                    handler.apply(view, binding.resId, skinRes)
+                    handler.apply(view, binding.resId, res)
                     continue
                 }
 
@@ -762,57 +766,57 @@ object ArsSkinEngine {
                 when (binding.attributeName) {
                     "background" -> {
                         when (binding.resourceType) {
-                            ResourceType.COLOR -> view.setBackgroundColor(skinRes.getColor(binding.resId, null))
+                            ResourceType.COLOR -> view.setBackgroundColor(res.getColor(binding.resId, null))
                             ResourceType.DRAWABLE, ResourceType.COLOR_STATE_LIST ->
-                                view.background = skinRes.getDrawable(binding.resId, null)
+                                view.background = res.getDrawable(binding.resId, null)
                             else -> {}
                         }
                     }
                     "textColor" -> {
                         if (view is android.widget.TextView) {
-                            view.setTextColor(skinRes.getColorStateList(binding.resId, null))
+                            view.setTextColor(res.getColorStateList(binding.resId, null))
                         }
                     }
                     "textColorHint" -> {
                         if (view is android.widget.TextView) {
-                            view.setHintTextColor(skinRes.getColorStateList(binding.resId, null))
+                            view.setHintTextColor(res.getColorStateList(binding.resId, null))
                         }
                     }
                     "src" -> {
                         if (view is android.widget.ImageView) {
-                            view.setImageDrawable(skinRes.getDrawable(binding.resId, null))
+                            view.setImageDrawable(res.getDrawable(binding.resId, null))
                         }
                     }
                     "tint" -> {
                         when (view) {
-                            is android.widget.ImageView -> view.imageTintList = skinRes.getColorStateList(binding.resId, null)
+                            is android.widget.ImageView -> view.imageTintList = res.getColorStateList(binding.resId, null)
                         }
                     }
                     "progressTint" -> {
                         if (view is android.widget.ProgressBar) {
-                            view.progressTintList = skinRes.getColorStateList(binding.resId, null)
+                            view.progressTintList = res.getColorStateList(binding.resId, null)
                         }
                     }
                     "thumbTint" -> {
                         if (view is android.widget.AbsSeekBar) {
-                            view.thumbTintList = skinRes.getColorStateList(binding.resId, null)
+                            view.thumbTintList = res.getColorStateList(binding.resId, null)
                         }
                     }
                     "buttonTint" -> {
                         if (view is android.widget.CompoundButton) {
-                            view.buttonTintList = skinRes.getColorStateList(binding.resId, null)
+                            view.buttonTintList = res.getColorStateList(binding.resId, null)
                         }
                     }
                     "textSize" -> {
                         if (view is android.widget.TextView) {
                             view.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX,
-                                skinRes.getDimension(binding.resId))
+                                res.getDimension(binding.resId))
                         }
                     }
                     "drawableStart", "drawableEnd", "drawableTop", "drawableBottom" -> {
                         if (view is android.widget.TextView) {
                             val drawables = view.compoundDrawablesRelative
-                            val d = skinRes.getDrawable(binding.resId, null)
+                            val d = res.getDrawable(binding.resId, null)
                             when (binding.attributeName) {
                                 "drawableStart" -> view.setCompoundDrawablesRelativeWithIntrinsicBounds(d, drawables[1], drawables[2], drawables[3])
                                 "drawableTop" -> view.setCompoundDrawablesRelativeWithIntrinsicBounds(drawables[0], d, drawables[2], drawables[3])
