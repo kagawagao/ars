@@ -87,6 +87,11 @@ open class ArsFragment : Fragment(), SkinChangeListener {
         super.onViewCreated(view, savedInstanceState)
         fragmentRootView = view
         ArsSkinEngine.registerSkinChangeListener(this)
+        // Apply current theme to newly created Views immediately.
+        // This is critical when the Fragment is re-attached (e.g., back stack
+        // navigation) after a theme switch has already occurred — without this,
+        // the re-inflated Views show stale (pre-switch) colors.
+        ArsViewTreeWalker.walk(view, ArsSkinEngine)
     }
 
     override fun onDestroyView() {
@@ -148,6 +153,11 @@ open class ArsFragment : Fragment(), SkinChangeListener {
      * @param inflater The LayoutInflater to wrap.
      */
     protected fun wrapInflater(inflater: LayoutInflater) {
+        // Idempotency: do not double-wrap if SkinLayoutInflater is already installed.
+        // The host Activity's LayoutInflater may already have SkinLayoutInflater set,
+        // and cloneInContext preserves Factory2 — double-wrapping causes duplicate
+        // View metadata registration and wastes memory.
+        if (inflater.factory2 is com.kagawagao.ars.internal.SkinLayoutInflater) return
         val originalFactory = inflater.factory2
         val skinFactory = ArsSkinEngine.createSkinFactory(originalFactory, requireContext())
         inflater.factory2 = skinFactory

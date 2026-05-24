@@ -24,7 +24,11 @@ class DemoDialog(context: Context) : ArsDialog(context) {
     }
 
     override fun onSkinApplied(previous: SkinPackage?, current: SkinPackage?) {
-        // Example: update window title after skin change
+        super.onSkinApplied(previous, current)
+        // Update dialog chrome: window background + title text color
+        setWindowBackgroundColor(R.color.theme_background)
+        setTitleTextColor(R.color.theme_text)
+        // Update title text to reflect current mode
         setTitle("ArsDialog — ${ArsSkinEngine.currentThemeMode}")
     }
 }

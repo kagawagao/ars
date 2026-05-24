@@ -5,10 +5,12 @@ import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
+import android.view.View
 import android.view.Window
 import androidx.annotation.CallSuper
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatDialog
+import com.kagawagao.ars.internal.SkinLayoutInflater
 
 /**
  * Base Dialog for ARS-skinning-enabled applications.
@@ -60,7 +62,10 @@ open class ArsDialog : AppCompatDialog, SkinChangeListener {
     @CallSuper
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        installSkinFactory()
+        // Factory2 is now installed in setContentView overrides,
+        // which guarantees it's present on the exact LayoutInflater
+        // instance used during inflation — not a potentially stale
+        // instance captured at onCreate time.
         isSkinned = true
     }
 
@@ -83,17 +88,29 @@ open class ArsDialog : AppCompatDialog, SkinChangeListener {
     // ─── SkinFactory Installation ─────────────────────────────────────
 
     /**
-     * Install the skin-aware LayoutInflater Factory2 on this dialog's
-     * LayoutInflater so that all XML-inflated Views are automatically
-     * registered for skin updates.
+     * Install the skin-aware LayoutInflater Factory2 on the LayoutInflater
+     * that [setContentView] will use. Called immediately before each
+     * inflation to guarantee Factory2 is present regardless of whether
+     * [LayoutInflater.from] returns a cached or new instance.
      */
-    private fun installSkinFactory() {
-        // Clone the inflater — the Activity's LayoutInflater may already have
-        // Factory2 set. Cloning gives us a fresh instance we can safely set.
-        val inflater = LayoutInflater.from(context).cloneInContext(context)
+    private fun ensureSkinFactory() {
+        val inflater = LayoutInflater.from(context)
+        if (inflater.factory2 is SkinLayoutInflater) return
         val originalFactory = inflater.factory2
         val skinFactory = ArsSkinEngine.createSkinFactory(originalFactory, context)
         inflater.factory2 = skinFactory
+    }
+
+    // ─── setContentView Overrides ─────────────────────────────────────
+
+    override fun setContentView(layoutResID: Int) {
+        ensureSkinFactory()
+        super.setContentView(layoutResID)
+    }
+
+    override fun setContentView(view: View) {
+        ensureSkinFactory()
+        super.setContentView(view)
     }
 
     // ─── Skin Application ─────────────────────────────────────────────
@@ -126,17 +143,82 @@ open class ArsDialog : AppCompatDialog, SkinChangeListener {
     // ─── Skin Change Handling ─────────────────────────────────────────
 
     /**
-     * Called after the active skin has changed and the dialog's View tree
-     * has been updated.
+     * Called after the active skin or theme has changed. Walks the dialog's
+     * decorView to update all registered Views with the current Resources.
      *
-     * Override this to perform custom post-skin-switch logic.
+     * Override to add custom chrome updates (window background, title color).
+     * Call `super.onSkinApplied(previous, current)` to ensure the tree-walk
+     * runs before your custom logic.
+     *
+     * ```kotlin
+     * override fun onSkinApplied(previous: SkinPackage?, current: SkinPackage?) {
+     *     super.onSkinApplied(previous, current)
+     *     setWindowBackground(R.color.theme_background)
+     * }
+     * ```
      */
     open fun onSkinApplied(previous: SkinPackage?, current: SkinPackage?) {
-        // Subclasses override to add custom post-skin-switch behavior
+        refreshChrome()
+    }
+
+    /**
+     * Walk the dialog's decorView and apply current skin/theme to all
+     * registered Views. Called by [onSkinApplied] on every change.
+     */
+    private fun refreshChrome() {
+        window?.decorView?.let { decorView ->
+            com.kagawagao.ars.internal.ArsViewTreeWalker.walk(decorView, ArsSkinEngine)
+        }
+    }
+
+    // ─── Chrome Helpers ────────────────────────────────────────────────
+
+    /**
+     * Set the dialog window's background drawable from a color resource.
+     *
+     * Uses skin-aware [Resources] so the color respects the active skin
+     * and current theme mode. Call from [onSkinApplied].
+     *
+     * @param colorResId A `R.color.*` resource ID (e.g., `R.color.theme_background`).
+     */
+    protected fun setWindowBackgroundColor(colorResId: Int) {
+        val res = context.resources
+        window?.setBackgroundDrawable(
+            android.graphics.drawable.ColorDrawable(res.getColor(colorResId, null))
+        )
+    }
+
+    /**
+     * Set the title text color from a color resource.
+     *
+     * Uses skin-aware [Resources]. Call from [onSkinApplied].
+     * Works with AppCompat's title bar (finds `androidx.appcompat.R.id.title`).
+     *
+     * @param colorResId A `R.color.*` resource ID (e.g., `R.color.theme_text`).
+     */
+    protected fun setTitleTextColor(colorResId: Int) {
+        val titleView = window?.findViewById<android.widget.TextView>(
+            getTitleViewId()
+        ) ?: return
+        val res = context.resources
+        titleView.setTextColor(res.getColor(colorResId, null))
+    }
+
+    /**
+     * Resolve the title view ID. AppCompat uses `support_action_bar_title`
+     * or a TextView with id `title` in the decor.
+     */
+    private fun getTitleViewId(): Int {
+        return try {
+            val field = androidx.appcompat.R.id::class.java.getField("title")
+            field.getInt(null)
+        } catch (_: Exception) {
+            // Fallback: search the decorView for the title TextView
+            android.R.id.title
+        }
     }
 
     final override fun onSkinChanged(previous: SkinPackage?, current: SkinPackage?) {
-        // Engine walks all windows centrally via walkAllWindows().
         Log.d(TAG, "onSkinChanged: ${this.javaClass.simpleName}, " +
             "hasDecor=${window?.decorView != null}, " +
             "prev=${previous?.name ?: "null"}, cur=${current?.name ?: "null"}")

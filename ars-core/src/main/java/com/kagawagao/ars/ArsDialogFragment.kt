@@ -7,10 +7,10 @@ import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
-import android.view.ViewGroup
 import androidx.annotation.CallSuper
 import androidx.annotation.RequiresApi
 import androidx.fragment.app.DialogFragment
+import com.kagawagao.ars.internal.ArsViewTreeWalker
 
 /**
  * Base DialogFragment for ARS-skinning-enabled applications.
@@ -100,29 +100,57 @@ open class ArsDialogFragment : DialogFragment(), SkinChangeListener {
      *
      * Subclasses that override this must call `super.onCreateDialog(savedInstanceState)`
      * OR manually wrap the dialog's Context and install the SkinLayoutInflater.
+     *
+     * Sets Factory2 directly on the LayoutInflater that [setContentView]
+     * will use — not on a clone. This is critical: a cloned inflater is
+     * discarded immediately, leaving the actual inflater untouched and
+     * dialog Views without [SkinViewMeta].
      */
     @CallSuper
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
         val ctx = wrappedContext ?: requireContext()
         val dialog = Dialog(ctx, theme)
 
-        // Install SkinLayoutInflater on the dialog's LayoutInflater
-        // so Views inflated from dialog layouts are automatically registered.
-        // Clone the inflater first — the Activity's LayoutInflater already has
-        // Factory2 set by ArsActivity; cloning gives us a fresh instance.
-        val inflater = LayoutInflater.from(ctx).cloneInContext(ctx)
-        val originalFactory = inflater.factory2
-        val skinFactory = ArsSkinEngine.createSkinFactory(originalFactory, ctx)
-        inflater.factory2 = skinFactory
+        // Set Factory2 directly on the LayoutInflater the dialog will use.
+        // Do NOT clone — the clone is discarded and has no effect on actual inflation.
+        val inflater = LayoutInflater.from(ctx)
+        if (inflater.factory2 !is com.kagawagao.ars.internal.SkinLayoutInflater) {
+            val originalFactory = inflater.factory2
+            val skinFactory = ArsSkinEngine.createSkinFactory(originalFactory, ctx)
+            inflater.factory2 = skinFactory
+        }
 
         return dialog
     }
 
     // ─── Lifecycle ────────────────────────────────────────────────────
 
+    /**
+     * Install the skin-aware LayoutInflater Factory2 on the inflater
+     * used by [onCreateView] for content View inflation.
+     *
+     * Without this, content Views in the dialog are inflated without
+     * [SkinLayoutInflater] interception, so they lack [SkinViewMeta]
+     * and won't be updated on theme/skin changes.
+     */
+    override fun onGetLayoutInflater(savedInstanceState: Bundle?): LayoutInflater {
+        val inflater = super.onGetLayoutInflater(savedInstanceState).cloneInContext(requireContext())
+        // Idempotency: do not double-wrap
+        if (inflater.factory2 !is com.kagawagao.ars.internal.SkinLayoutInflater) {
+            val originalFactory = inflater.factory2
+            val skinFactory = ArsSkinEngine.createSkinFactory(originalFactory, requireContext())
+            inflater.factory2 = skinFactory
+        }
+        return inflater
+    }
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         ArsSkinEngine.registerSkinChangeListener(this)
+        // Apply current theme to newly created Views immediately.
+        // This is essential when the dialog is shown after a theme switch
+        // has already occurred — Views are inflated but never walked.
+        ArsViewTreeWalker.walk(view, ArsSkinEngine)
     }
 
     override fun onStart() {
@@ -145,17 +173,19 @@ open class ArsDialogFragment : DialogFragment(), SkinChangeListener {
     // ─── Skin Change Handling ─────────────────────────────────────────
 
     /**
-     * Called after the active skin has changed and the dialog's View tree
-     * has been updated.
+     * Called after the active skin or theme has changed. Walks the dialog's
+     * decorView to update all registered Views and chrome elements.
      *
-     * Override this to perform custom post-skin-switch logic.
+     * Override to add custom chrome updates (window background, title color).
+     * Call `super.onSkinApplied(previous, current)` first.
      */
     open fun onSkinApplied(previous: SkinPackage?, current: SkinPackage?) {
-        // Subclasses override to add custom behavior
+        dialog?.window?.decorView?.let { decorView ->
+            ArsViewTreeWalker.walk(decorView, ArsSkinEngine)
+        }
     }
 
     final override fun onSkinChanged(previous: SkinPackage?, current: SkinPackage?) {
-        // Engine walks all windows centrally via walkAllWindows().
         Log.d(TAG, "onSkinChanged: ${this.javaClass.simpleName}, " +
             "hasDecor=${dialog?.window?.decorView != null}, " +
             "prev=${previous?.name ?: "null"}, cur=${current?.name ?: "null"}")
