@@ -183,6 +183,23 @@ object ArsSkinEngine {
      */
     private val activeActivities = mutableSetOf<WeakReference<android.app.Activity>>()
 
+    // ─── Active Windows (Dialogs, Popups, etc.) ────────────────────────
+
+    /**
+     * Registry of View tree roots for non-Activity windows (Dialogs,
+     * DialogFragments, PopupWindows, Snackbar overlays, etc.).
+     *
+     * Each entry is a decorView or content root View. On every skin/theme
+     * change, the engine walks ALL windows — Activity decorViews AND
+     * registered window roots — in a single pass. This eliminates the
+     * need for each UI component to implement [SkinChangeListener] and
+     * walk its own tree.
+     *
+     * Uses [WeakReference] to avoid leaking Views after their window
+     * is dismissed without explicit unregistration.
+     */
+    private val activeWindows = mutableSetOf<WeakReference<View>>()
+
     // ─── Initialization ───────────────────────────────────────────────
 
     /**
@@ -275,7 +292,7 @@ object ArsSkinEngine {
                 updateAllSkinResources(skin.resources, skin.packageName)
 
                 // Walk View trees for all active Activities
-                walkAllActivityTrees()
+                walkAllWindows()
 
                 // Track timing
                 lastSwitchDurationMs = System.currentTimeMillis() - startTime
@@ -335,7 +352,7 @@ object ArsSkinEngine {
                 updateAllSkinResources(null, null)
 
                 // Walk View trees to reset all Views to default
-                walkAllActivityTrees()
+                walkAllWindows()
 
                 // Notify listeners
                 notifySkinChangeListeners(oldSkin, null)
@@ -397,7 +414,7 @@ object ArsSkinEngine {
 
                 invalidateIdCache()
                 updateAllSkinResources(skin.resources, skin.packageName)
-                walkAllActivityTrees()
+                walkAllWindows()
 
                 lastSwitchDurationMs = System.currentTimeMillis() - startTime
                 lastError = null
@@ -490,7 +507,7 @@ object ArsSkinEngine {
         Log.i(TAG, "setThemeMode: updated ${skinResourcesRefs.size} SkinResources instances")
 
         // Walk all View trees so that all Views reflect the new theme
-        walkAllActivityTrees()
+        walkAllWindows()
 
         // Notify listeners that the effective theme has changed
         notifySkinChangeListeners(activeSkin, activeSkin)
@@ -622,6 +639,7 @@ object ArsSkinEngine {
             registeredViewCount = viewRegistry.size,
             aliveViewCount = aliveViewCount,
             listenerCount = skinChangeListeners.size,
+            windowCount = activeWindows.size,
             registeredAttributeCount = builtInAttrCount + attributeHandlers.size,
             cachedIdMappings = resourceIdCache.snapshot().size,
             lastSwitchDurationMs = lastSwitchDurationMs,
@@ -656,6 +674,48 @@ object ArsSkinEngine {
     }
 
     /**
+     * Register a window's root View for automatic skin/theme refresh.
+     *
+     * Call this when a Dialog, DialogFragment, PopupWindow, or any
+     * window with its own decorView/content root is shown. The engine
+     * will walk this root on every [switchSkin], [resetToDefault], and
+     * [setThemeMode] call — no need to implement [SkinChangeListener]
+     * for tree refreshing.
+     *
+     * @param root The root View to walk (e.g., `dialog.window.decorView`).
+     */
+    fun registerWindow(root: View) {
+        activeWindows.add(WeakReference(root))
+        Log.d(TAG, "registerWindow: ${root.javaClass.simpleName}, total=${activeWindows.size}")
+    }
+
+    /**
+     * Unregister a window's root View.
+     *
+     * Call this when the window is dismissed/destroyed.
+     *
+     * @param root The root View previously registered via [registerWindow].
+     */
+    fun unregisterWindow(root: View) {
+        activeWindows.removeAll { it.get() == null || it.get() === root }
+        Log.d(TAG, "unregisterWindow: ${root.javaClass.simpleName}, total=${activeWindows.size}")
+    }
+
+    /**
+     * Walk a View tree and apply the current skin immediately.
+     *
+     * Convenience for cases where a window was just created and needs
+     * an initial skin application before the next theme/skin change.
+     * The same as calling [registerWindow] followed by an immediate walk.
+     *
+     * @param root The root View to walk.
+     */
+    fun walkViewTree(root: View) {
+        registerWindow(root)
+        ArsViewTreeWalker.walk(root, this)
+    }
+
+    /**
      * Release all skin resources and clear state.
      *
      * Called when the host [Application] is terminated.
@@ -675,6 +735,7 @@ object ArsSkinEngine {
                 viewRegistry.clear()
                 skinResourcesRefs.clear()
                 activeActivities.clear()
+                activeWindows.clear()
                 skinLoader = null
                 initialized = false
             }
@@ -703,23 +764,39 @@ object ArsSkinEngine {
     }
 
     /**
-     * Walk the View tree of every registered active Activity.
+     * Walk the View tree of every registered window (Activities, Dialogs,
+     * PopupWindows, Snackbars, etc.) in a single pass.
      *
      * Called during [switchSkin], [resetToDefault], and [setThemeMode].
-     * Applies the current skin to all registered Views in each Activity.
+     * Applies the current skin/theme to all registered Views.
      */
-    private fun walkAllActivityTrees() {
+    private fun walkAllWindows() {
         // Purge GC'd references
         activeActivities.removeAll { it.get() == null }
-        val aliveCount = activeActivities.size
-        Log.d(TAG, "walkAllActivityTrees: walking $aliveCount active activities")
+        activeWindows.removeAll { it.get() == null }
+
+        val activityCount = activeActivities.size
+        val windowCount = activeWindows.size
+        Log.d(TAG, "walkAllWindows: $activityCount activities + $windowCount windows")
+
+        // Walk Activity decorViews
         activeActivities.forEach { ref ->
             ref.get()?.let { activity ->
                 try {
                     ArsViewTreeWalker.walk(activity.window?.decorView ?: return@let, this)
                 } catch (_: Exception) {
-                    // Activity may have been destroyed between registration and walk
-                    Log.d(TAG, "walkAllActivityTrees: failed to walk ${activity.javaClass.simpleName}")
+                    Log.d(TAG, "walkAllWindows: failed to walk ${activity.javaClass.simpleName}")
+                }
+            }
+        }
+
+        // Walk non-Activity window roots (Dialogs, PopupWindows, etc.)
+        activeWindows.forEach { ref ->
+            ref.get()?.let { root ->
+                try {
+                    ArsViewTreeWalker.walk(root, this)
+                } catch (_: Exception) {
+                    Log.d(TAG, "walkAllWindows: failed to walk ${root.javaClass.simpleName}")
                 }
             }
         }

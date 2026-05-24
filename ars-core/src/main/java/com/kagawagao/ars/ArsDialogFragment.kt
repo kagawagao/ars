@@ -4,6 +4,7 @@ import android.app.Dialog
 import android.content.Context
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -73,6 +74,10 @@ import androidx.fragment.app.DialogFragment
 @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
 open class ArsDialogFragment : DialogFragment(), SkinChangeListener {
 
+    companion object {
+        private const val TAG = "ARS_DialogFragment"
+    }
+
     private var wrappedContext: Context? = null
 
     // ─── Context Wrapping ─────────────────────────────────────────────
@@ -120,6 +125,18 @@ open class ArsDialogFragment : DialogFragment(), SkinChangeListener {
         ArsSkinEngine.registerSkinChangeListener(this)
     }
 
+    override fun onStart() {
+        super.onStart()
+        // Register the dialog's decorView so the engine walks it
+        // on every skin/theme change — no per-class walk needed.
+        dialog?.window?.decorView?.let { ArsSkinEngine.registerWindow(it) }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        dialog?.window?.decorView?.let { ArsSkinEngine.unregisterWindow(it) }
+    }
+
     override fun onDestroyView() {
         super.onDestroyView()
         ArsSkinEngine.unregisterSkinChangeListener(this)
@@ -138,10 +155,10 @@ open class ArsDialogFragment : DialogFragment(), SkinChangeListener {
     }
 
     final override fun onSkinChanged(previous: SkinPackage?, current: SkinPackage?) {
-        // Walk the dialog's window decorView to apply the new skin
-        dialog?.window?.decorView?.let { decorView ->
-            com.kagawagao.ars.internal.ArsViewTreeWalker.walk(decorView, ArsSkinEngine)
-        }
+        // Engine walks all windows centrally via walkAllWindows().
+        Log.d(TAG, "onSkinChanged: ${this.javaClass.simpleName}, " +
+            "hasDecor=${dialog?.window?.decorView != null}, " +
+            "prev=${previous?.name ?: "null"}, cur=${current?.name ?: "null"}")
         onSkinApplied(previous, current)
     }
 }

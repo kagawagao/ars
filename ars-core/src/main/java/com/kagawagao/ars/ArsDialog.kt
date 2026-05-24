@@ -3,6 +3,7 @@ package com.kagawagao.ars
 import android.content.Context
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.Window
 import androidx.annotation.CallSuper
@@ -43,6 +44,10 @@ import androidx.appcompat.app.AppCompatDialog
 @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
 open class ArsDialog : AppCompatDialog, SkinChangeListener {
 
+    companion object {
+        private const val TAG = "ARS_Dialog"
+    }
+
     private var isSkinned = false
 
     // ─── Constructors ─────────────────────────────────────────────────
@@ -61,16 +66,17 @@ open class ArsDialog : AppCompatDialog, SkinChangeListener {
 
     override fun onStart() {
         super.onStart()
-        // Register after the window is attached so onSkinChanged
-        // can safely walk the decorView
+        // Register the dialog's decorView so the engine walks it centrally
+        window?.decorView?.let { ArsSkinEngine.registerWindow(it) }
+        // Register for skin change notifications (for onSkinApplied callback)
         ArsSkinEngine.registerSkinChangeListener(this)
-        // Apply initial skin to Views that may have been inflated
-        // before the listener was registered
+        // Apply initial skin to Views inflated before listener was registered
         applySkinNow()
     }
 
     override fun onStop() {
         super.onStop()
+        window?.decorView?.let { ArsSkinEngine.unregisterWindow(it) }
         ArsSkinEngine.unregisterSkinChangeListener(this)
     }
 
@@ -130,10 +136,10 @@ open class ArsDialog : AppCompatDialog, SkinChangeListener {
     }
 
     final override fun onSkinChanged(previous: SkinPackage?, current: SkinPackage?) {
-        // Walk the dialog's decorView to apply the new skin
-        window?.decorView?.let { decorView ->
-            com.kagawagao.ars.internal.ArsViewTreeWalker.walk(decorView, ArsSkinEngine)
-        }
+        // Engine walks all windows centrally via walkAllWindows().
+        Log.d(TAG, "onSkinChanged: ${this.javaClass.simpleName}, " +
+            "hasDecor=${window?.decorView != null}, " +
+            "prev=${previous?.name ?: "null"}, cur=${current?.name ?: "null"}")
         onSkinApplied(previous, current)
     }
 }

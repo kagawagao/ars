@@ -164,6 +164,7 @@ class ArsSkinEngineTest {
             registeredViewCount = 0,
             aliveViewCount = 0,
             listenerCount = 0,
+            windowCount = 0,
             registeredAttributeCount = 13,
             cachedIdMappings = 0,
             lastSwitchDurationMs = -1,

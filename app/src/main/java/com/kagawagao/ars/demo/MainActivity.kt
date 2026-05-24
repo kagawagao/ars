@@ -24,7 +24,6 @@ import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.snackbar.Snackbar
 import com.kagawagao.ars.ArsActivity
 import com.kagawagao.ars.ArsDialogFragment
-import com.kagawagao.ars.ArsOverlaySkin
 import com.kagawagao.ars.ArsPopupWindow
 import com.kagawagao.ars.ArsSkinEngine
 import com.kagawagao.ars.ArsSpinnerAdapter
@@ -262,16 +261,13 @@ class MainActivity : ArsActivity() {
             .setPositiveButton("确定", null)
             .create()
 
-        // Register skin-change listener for the dialog's lifetime
-        val skinListener = object : com.kagawagao.ars.SkinChangeListener {
-            override fun onSkinChanged(previous: SkinPackage?, current: SkinPackage?) {
-                dialog.window?.decorView?.let {
-                    ArsOverlaySkin.refresh(it)
-                }
-            }
+        dialog.setOnShowListener {
+            // Register and apply initial skin in one call
+            dialog.window?.decorView?.let { ArsSkinEngine.walkViewTree(it) }
         }
-        ArsSkinEngine.registerSkinChangeListener(skinListener)
-        dialog.setOnDismissListener { ArsSkinEngine.unregisterSkinChangeListener(skinListener) }
+        dialog.setOnDismissListener {
+            dialog.window?.decorView?.let { ArsSkinEngine.unregisterWindow(it) }
+        }
 
         dialog.show()
     }
@@ -307,11 +303,11 @@ class MainActivity : ArsActivity() {
             show()
         }
 
-        // Walk content on skin change
-        val listener = ArsOverlaySkin.autoRefresh(snackbar.view)
+        // Register Snackbar view so engine walks it on theme change
+        ArsSkinEngine.registerWindow(snackbar.view)
         snackbar.addCallback(object : Snackbar.Callback() {
             override fun onDismissed(transientBottomBar: Snackbar?, event: Int) {
-                ArsSkinEngine.unregisterSkinChangeListener(listener)
+                snackbar.view.let { ArsSkinEngine.unregisterWindow(it) }
             }
         })
     }

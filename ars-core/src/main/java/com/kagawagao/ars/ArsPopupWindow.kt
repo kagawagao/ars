@@ -2,6 +2,7 @@ package com.kagawagao.ars
 
 import android.content.Context
 import android.os.Build
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -50,6 +51,10 @@ import androidx.annotation.RequiresApi
 @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
 open class ArsPopupWindow : PopupWindow, SkinChangeListener {
 
+    companion object {
+        private const val TAG = "ARS_PopupWindow"
+    }
+
     /**
      * The wrapped Context that returns skin-aware Resources.
      *
@@ -95,6 +100,8 @@ open class ArsPopupWindow : PopupWindow, SkinChangeListener {
     override fun showAsDropDown(anchor: View?) {
         super.showAsDropDown(anchor)
         if (!isShowing) {
+            // Register content root so engine walks it on skin/theme changes
+            contentView?.let { ArsSkinEngine.registerWindow(it) }
             // Apply initial skin before first show
             contentView?.let { walkContent(it) }
             ArsSkinEngine.registerSkinChangeListener(this)
@@ -105,6 +112,7 @@ open class ArsPopupWindow : PopupWindow, SkinChangeListener {
     override fun showAsDropDown(anchor: View?, xoff: Int, yoff: Int) {
         super.showAsDropDown(anchor, xoff, yoff)
         if (!isShowing) {
+            contentView?.let { ArsSkinEngine.registerWindow(it) }
             contentView?.let { walkContent(it) }
             ArsSkinEngine.registerSkinChangeListener(this)
             isShowing = true
@@ -114,6 +122,7 @@ open class ArsPopupWindow : PopupWindow, SkinChangeListener {
     override fun showAsDropDown(anchor: View?, xoff: Int, yoff: Int, gravity: Int) {
         super.showAsDropDown(anchor, xoff, yoff, gravity)
         if (!isShowing) {
+            contentView?.let { ArsSkinEngine.registerWindow(it) }
             contentView?.let { walkContent(it) }
             ArsSkinEngine.registerSkinChangeListener(this)
             isShowing = true
@@ -123,6 +132,7 @@ open class ArsPopupWindow : PopupWindow, SkinChangeListener {
     override fun showAtLocation(parent: View?, gravity: Int, x: Int, y: Int) {
         super.showAtLocation(parent, gravity, x, y)
         if (!isShowing) {
+            contentView?.let { ArsSkinEngine.registerWindow(it) }
             contentView?.let { walkContent(it) }
             ArsSkinEngine.registerSkinChangeListener(this)
             isShowing = true
@@ -131,6 +141,7 @@ open class ArsPopupWindow : PopupWindow, SkinChangeListener {
 
     override fun dismiss() {
         if (isShowing) {
+            contentView?.let { ArsSkinEngine.unregisterWindow(it) }
             ArsSkinEngine.unregisterSkinChangeListener(this)
             isShowing = false
         }
@@ -140,7 +151,10 @@ open class ArsPopupWindow : PopupWindow, SkinChangeListener {
     // ─── Skin Change Handling ─────────────────────────────────────────
 
     final override fun onSkinChanged(previous: SkinPackage?, current: SkinPackage?) {
-        contentView?.let { walkContent(it) }
+        // Engine walks all windows centrally via walkAllWindows().
+        Log.d(TAG, "onSkinChanged: ${this.javaClass.simpleName}, " +
+            "isShowing=$isShowing, " +
+            "prev=${previous?.name ?: "null"}, cur=${current?.name ?: "null"}")
         onSkinApplied(previous, current)
     }
 

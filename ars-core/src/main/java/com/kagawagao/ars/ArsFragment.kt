@@ -3,6 +3,7 @@ package com.kagawagao.ars
 import android.content.Context
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -38,6 +39,10 @@ import com.kagawagao.ars.internal.ArsViewTreeWalker
  */
 @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
 open class ArsFragment : Fragment(), SkinChangeListener {
+
+    companion object {
+        private const val TAG = "ARS_Fragment"
+    }
 
     /** The root View of this Fragment. Set in [onCreateView]. */
     private var fragmentRootView: View? = null
@@ -114,8 +119,11 @@ open class ArsFragment : Fragment(), SkinChangeListener {
      * This method delegates to [onSkinApplied] for subclass-level customization.
      */
     final override fun onSkinChanged(previous: SkinPackage?, current: SkinPackage?) {
-        // The engine has already walked the View tree.
-        // Only notify the subclass for custom post-skin-switch behavior.
+        // Engine walks all windows centrally via walkAllWindows().
+        // No need to walk here — just notify the subclass.
+        Log.d(TAG, "onSkinChanged: ${this.javaClass.simpleName}, " +
+            "hasRoot=${fragmentRootView != null}, " +
+            "prev=${previous?.name ?: "null"}, cur=${current?.name ?: "null"}")
         onSkinApplied(previous, current)
     }
 

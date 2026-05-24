@@ -15,6 +15,7 @@ import androidx.annotation.RequiresApi
  * @property registeredViewCount Total number of Views ever registered with the engine.
  * @property aliveViewCount Number of registered Views that are still alive (not GC'd).
  * @property listenerCount Number of registered [SkinChangeListener] instances.
+ * @property windowCount Number of registered non-Activity windows (Dialogs, Popups, etc.).
  * @property registeredAttributeCount Number of registered custom [SkinAttributeHandler] instances
  *           plus built-in attributes.
  * @property cachedIdMappings Number of cached (hostResId → skinResId) mappings, or `-1` if
@@ -32,6 +33,7 @@ data class SkinDiagnostics(
     val registeredViewCount: Int,
     val aliveViewCount: Int,
     val listenerCount: Int,
+    val windowCount: Int,
     val registeredAttributeCount: Int,
     val cachedIdMappings: Int,
     val lastSwitchDurationMs: Long,
