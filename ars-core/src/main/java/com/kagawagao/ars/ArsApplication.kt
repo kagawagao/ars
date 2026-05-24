@@ -5,17 +5,42 @@ import android.os.Build
 import androidx.annotation.RequiresApi
 
 /**
- * ARS Application 基类
- * 
- * 使用 ARS 框架的应用需要继承此类
- * 或在自己的 Application 中初始化 ArsSkinManager
+ * Base Application for ARS-skinning-enabled applications.
+ *
+ * Extend this instead of [Application]. Initializes [ArsSkinEngine] on startup.
+ * Activity lifecycle tracking is handled by [ArsActivity] registering itself
+ * directly with the engine via [ArsSkinEngine.registerActiveActivity].
+ *
+ * ## Usage
+ *
+ * ```kotlin
+ * class MyApp : ArsApplication() {
+ *     override fun onCreate() {
+ *         super.onCreate()
+ *         // Custom initialization
+ *     }
+ * }
+ * ```
+ *
+ * The [skinEngine] property provides access to the central engine for
+ * skin loading and management.
  */
-@RequiresApi(34)
+@RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
 open class ArsApplication : Application() {
-    
+
+    /**
+     * The application-scoped skin engine instance.
+     *
+     * Available after [onCreate] completes. Use this to load skins,
+     * register listeners, and query diagnostics.
+     */
+    val skinEngine: ArsSkinEngine
+        get() = ArsSkinEngine
+
     override fun onCreate() {
         super.onCreate()
-        // 初始化皮肤管理器
-        ArsSkinManager.getInstance(this)
+
+        // Initialize the skin engine — must happen before any Activity starts
+        ArsSkinEngine.init(this)
     }
 }
