@@ -2,6 +2,7 @@ package com.kagawagao.ars.demo
 
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
@@ -52,6 +53,10 @@ import kotlinx.coroutines.withContext
 @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
 class MainActivity : ArsActivity() {
 
+    companion object {
+        private const val TAG = "ARS_Demo"
+    }
+
     // ─── Views ────────────────────────────────────────────────────────
     private lateinit var tvCurrentTheme: TextView
     private lateinit var tvSkinStatus: TextView
@@ -73,6 +78,11 @@ class MainActivity : ArsActivity() {
         initViews()
         setupListeners()
         updateUI()
+
+        val diag = ArsSkinEngine.getDiagnostics()
+        Log.i(TAG, "DemoActivity created, " +
+            "theme=${ArsSkinEngine.currentThemeMode}, " +
+            "diag=views=${diag.registeredViewCount}/${diag.aliveViewCount}")
     }
 
     override fun onDestroy() {
@@ -160,8 +170,15 @@ class MainActivity : ArsActivity() {
             SkinPackage.ThemeMode.LIGHT -> SkinPackage.ThemeMode.DARK
             SkinPackage.ThemeMode.DARK -> SkinPackage.ThemeMode.LIGHT
         }
+        Log.i(TAG, "toggleTheme: ${ArsSkinEngine.currentThemeMode} → $newMode")
         setSkinThemeMode(newMode)
         updateUI()
+
+        // Verify the change took effect
+        val diag = ArsSkinEngine.getDiagnostics()
+        Log.i(TAG, "toggleTheme done: theme=${ArsSkinEngine.currentThemeMode}, " +
+            "skin=${ArsSkinEngine.activeSkin?.name ?: "null"}, " +
+            "diag=views=${diag.registeredViewCount}/${diag.aliveViewCount}")
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -185,17 +202,20 @@ class MainActivity : ArsActivity() {
     }
 
     private fun loadSkin(path: String) {
+        Log.i(TAG, "loadSkin: path=$path")
         scope.launch {
             val result = switchSkin(path)
             withContext(Dispatchers.Main) {
                 when (result) {
                     is SkinResult.Success -> {
                         val skin = ArsSkinEngine.activeSkin
+                        Log.i(TAG, "loadSkin SUCCESS: ${skin?.name} v${skin?.version}")
                         Toast.makeText(this@MainActivity,
                             getString(R.string.skin_loaded, skin?.name ?: "?"),
                             Toast.LENGTH_SHORT).show()
                     }
                     is SkinResult.Error -> {
+                        Log.w(TAG, "loadSkin FAILED: ${result.error.message}")
                         Toast.makeText(this@MainActivity,
                             getString(R.string.skin_load_failed, result.error.message),
                             Toast.LENGTH_LONG).show()
@@ -207,16 +227,21 @@ class MainActivity : ArsActivity() {
     }
 
     private fun resetSkinToDefault() {
+        Log.i(TAG, "resetSkinToDefault")
         scope.launch {
             val result = resetSkin()
             withContext(Dispatchers.Main) {
                 when (result) {
-                    is SkinResult.Success ->
+                    is SkinResult.Success -> {
+                        Log.i(TAG, "resetSkinToDefault SUCCESS")
                         Toast.makeText(this@MainActivity, R.string.skin_reset_done, Toast.LENGTH_SHORT).show()
-                    is SkinResult.Error ->
+                    }
+                    is SkinResult.Error -> {
+                        Log.w(TAG, "resetSkinToDefault FAILED: ${result.error.message}")
                         Toast.makeText(this@MainActivity,
                             getString(R.string.skin_load_failed, result.error.message),
                             Toast.LENGTH_LONG).show()
+                    }
                 }
                 updateUI()
             }

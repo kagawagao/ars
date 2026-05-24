@@ -1,6 +1,8 @@
 package com.kagawagao.ars.internal
 
+import android.content.Context
 import android.content.res.ColorStateList
+import android.content.res.Configuration
 import android.content.res.Resources
 import android.graphics.drawable.Drawable
 import android.os.Build
@@ -13,35 +15,50 @@ import androidx.annotation.RequiresApi
  * skin overlay behavior.
  *
  * For each resource lookup, checks the skin [Resources] first, then falls
- * through to the base (host app) Resources. This is the core mechanism
- * that makes `getResources().getColor()` return skin-aware values without
- * any developer intervention.
+ * through to the theme-aware host [Resources] (managed via [themedResources]).
+ * This is the core mechanism that makes `getResources().getColor()` return
+ * skin-aware values without any developer intervention.
  *
  * Resource resolution uses a **name-based lookup** strategy:
  * 1. Resolve the resource name from the host resId via [baseResources].
  * 2. Look up the same name in the skin APK via [skinResources].
- * 3. If found in skin, return the skin value. Otherwise, fall through to base.
+ * 3. If found in skin, return the skin value. Otherwise, fall through to [themedResources].
  *
  * This avoids relying on matching resource IDs between APKs (which AAPT
  * assigns differently) and avoids using reflection on hidden APIs.
  *
- * @param baseResources The host application's Resources.
+ * ## Theme Mode Support
+ *
+ * On API 34+, [Resources.updateConfiguration] is deprecated and may not
+ * propagate uiMode changes to the native AssetManager layer. Instead of
+ * calling updateConfiguration on a live Resources object, we use
+ * [Context.createConfigurationContext] to create a fresh Resources with
+ * the desired uiMode baked in. This ensures that night-qualified resources
+ * (e.g. `values-night/colors.xml`) are resolved correctly without relying
+ * on deprecated APIs.
+ *
+ * @param baseResources The host application's Resources (for metadata lookups only).
+ * @param themedResources The current theme-aware Resources (for value lookups).
  * @param skinResources The skin APK's Resources, or `null` if no skin is active.
  * @param skinPackageName The package name of the skin APK, or `null` if no skin.
  * @param hostPackageName The host application's package name (for resource name parsing).
+ * @param hostContext The base (unwrapped) Context, used for createConfigurationContext on theme change.
+ * @param idCacheResolver Optional LRU cache callback for skin ID resolution.
  */
 @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
 @Suppress("DEPRECATION")  // getDrawable(int, Theme) deprecated API 34, removed API 36
 internal class SkinResources(
     private val baseResources: Resources,
+    private var themedResources: Resources,
     private var skinResources: Resources?,
     private var skinPackageName: String?,
     private val hostPackageName: String,
+    private val hostContext: Context,
     private val idCacheResolver: ((Int, () -> Int) -> Int)? = null
 ) : Resources(baseResources.assets, baseResources.displayMetrics, baseResources.configuration) {
 
     companion object {
-        private const val TAG = "SkinResources"
+        private const val TAG = "ARS_SkinResources"
     }
 
     // ─── Color ────────────────────────────────────────────────────────
@@ -51,7 +68,7 @@ internal class SkinResources(
         return if (skinId != 0) {
             skinResources!!.getColor(skinId, theme)
         } else {
-            baseResources.getColor(id, theme)
+            themedResources.getColor(id, theme)
         }
     }
 
@@ -60,7 +77,7 @@ internal class SkinResources(
         return if (skinId != 0) {
             skinResources!!.getColorStateList(skinId, theme)
         } else {
-            baseResources.getColorStateList(id, theme)
+            themedResources.getColorStateList(id, theme)
         }
     }
 
@@ -71,7 +88,7 @@ internal class SkinResources(
         return if (skinId != 0) {
             skinResources!!.getDrawable(skinId, theme)
         } else {
-            baseResources.getDrawable(id, theme)
+            themedResources.getDrawable(id, theme)
         }
     }
 
@@ -82,7 +99,7 @@ internal class SkinResources(
             skinResources!!.getDrawableForDensity(skinId, density, theme)
                 ?: throw Resources.NotFoundException("Skin drawable resource ID #0x${Integer.toHexString(skinId)}")
         } else {
-            baseResources.getDrawableForDensity(id, density, theme)
+            themedResources.getDrawableForDensity(id, density, theme)
                 ?: throw Resources.NotFoundException("Drawable resource ID #0x${Integer.toHexString(id)}")
         }
     }
@@ -94,7 +111,7 @@ internal class SkinResources(
         return if (skinId != 0) {
             skinResources!!.getDimension(skinId)
         } else {
-            baseResources.getDimension(id)
+            themedResources.getDimension(id)
         }
     }
 
@@ -103,7 +120,7 @@ internal class SkinResources(
         return if (skinId != 0) {
             skinResources!!.getDimensionPixelOffset(skinId)
         } else {
-            baseResources.getDimensionPixelOffset(id)
+            themedResources.getDimensionPixelOffset(id)
         }
     }
 
@@ -112,7 +129,7 @@ internal class SkinResources(
         return if (skinId != 0) {
             skinResources!!.getDimensionPixelSize(skinId)
         } else {
-            baseResources.getDimensionPixelSize(id)
+            themedResources.getDimensionPixelSize(id)
         }
     }
 
@@ -123,7 +140,7 @@ internal class SkinResources(
         return if (skinId != 0) {
             skinResources!!.getString(skinId)
         } else {
-            baseResources.getString(id)
+            themedResources.getString(id)
         }
     }
 
@@ -132,7 +149,7 @@ internal class SkinResources(
         return if (skinId != 0) {
             skinResources!!.getText(skinId)
         } else {
-            baseResources.getText(id)
+            themedResources.getText(id)
         }
     }
 
@@ -143,12 +160,12 @@ internal class SkinResources(
         if (skinId != 0) {
             skinResources!!.getValue(skinId, outValue, resolveRefs)
         } else {
-            baseResources.getValue(id, outValue, resolveRefs)
+            themedResources.getValue(id, outValue, resolveRefs)
         }
     }
 
     override fun getValue(name: String, outValue: TypedValue, resolveRefs: Boolean) {
-        // For name-based lookups, try skin first, then base
+        // For name-based lookups, try skin first, then themed
         if (skinResources != null && skinPackageName != null) {
             val skinId = skinResources!!.getIdentifier(name, null, skinPackageName)
             if (skinId != 0) {
@@ -156,7 +173,7 @@ internal class SkinResources(
                 return
             }
         }
-        baseResources.getValue(name, outValue, resolveRefs)
+        themedResources.getValue(name, outValue, resolveRefs)
     }
 
     // ─── Package Name ─────────────────────────────────────────────────
@@ -166,7 +183,7 @@ internal class SkinResources(
         return if (skinId != 0) {
             skinResources!!.getResourcePackageName(skinId)
         } else {
-            baseResources.getResourcePackageName(id)
+            themedResources.getResourcePackageName(id)
         }
     }
 
@@ -181,6 +198,40 @@ internal class SkinResources(
     fun updateSkin(skinResources: Resources?, skinPackageName: String?) {
         this.skinResources = skinResources
         this.skinPackageName = skinPackageName
+        if (Log.isLoggable(TAG, Log.DEBUG)) {
+            Log.d(TAG, "Skin updated: pkg=${skinPackageName ?: "null"}, " +
+                "hasResources=${skinResources != null}")
+        }
+    }
+
+    /**
+     * Update the theme configuration of [themedResources].
+     *
+     * Called by [ArsSkinEngine.setThemeMode] when the user toggles between
+     * light/dark mode. Uses [Context.createConfigurationContext] to create a
+     * fresh [Resources] object with the target [Configuration.uiMode] baked in.
+     *
+     * This is the **critical path** for theme-only switches (no skin loaded):
+     * all View-level resource lookups go through [themedResources], and without
+     * this update, night-qualified resources like `values-night/colors.xml`
+     * are never resolved.
+     *
+     * **API 34+ safety**: On API 34+, [Resources.updateConfiguration] is
+     * deprecated and may be a no-op when `compat` is null. Using
+     * [createConfigurationContext] avoids relying on deprecated APIs.
+     *
+     * @param config The new [Configuration] with the desired uiMode.
+     */
+    fun updateBaseConfiguration(config: Configuration) {
+        val oldUiMode = themedResources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
+        val newUiMode = config.uiMode and Configuration.UI_MODE_NIGHT_MASK
+
+        themedResources = hostContext.createConfigurationContext(config).resources
+
+        Log.i(TAG, "Theme mode updated: " +
+            "uiMode=${if (oldUiMode == Configuration.UI_MODE_NIGHT_YES) "DARK" else "LIGHT"} → " +
+            "${if (newUiMode == Configuration.UI_MODE_NIGHT_YES) "DARK" else "LIGHT"}, " +
+            "pkg=${hostPackageName}")
     }
 
     // ─── Private Helpers ──────────────────────────────────────────────

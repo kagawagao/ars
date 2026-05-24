@@ -3,6 +3,7 @@ package com.kagawagao.ars
 import android.app.Application
 import android.content.Context
 import android.os.Build
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import androidx.annotation.RequiresApi
@@ -52,6 +53,8 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
 object ArsSkinEngine {
+
+    private const val TAG = "ARS_SkinEngine"
 
     // ─── Coroutine Scope ──────────────────────────────────────────────
 
@@ -194,6 +197,7 @@ object ArsSkinEngine {
         appContext = application
         skinLoader = ArsSkinLoader(application)
         initialized = true
+        Log.i(TAG, "ArsSkinEngine initialized: pkg=${application.packageName}")
     }
 
     // ─── Skin Control ─────────────────────────────────────────────────
@@ -420,7 +424,11 @@ object ArsSkinEngine {
     fun setThemeMode(mode: SkinPackage.ThemeMode) {
         ensureInitialized()
 
-        if (currentThemeMode == mode) return
+        if (currentThemeMode == mode) {
+            Log.d(TAG, "setThemeMode: already in ${mode}, skipping")
+            return
+        }
+        val previousMode = currentThemeMode
         currentThemeMode = mode
 
         val appCtx = appContext ?: return
@@ -433,26 +441,43 @@ object ArsSkinEngine {
                 android.content.res.Configuration.UI_MODE_NIGHT_NO
         }
 
+        // Compute the target configuration once.
+        // We merge with appCtx.resources.configuration to preserve density,
+        // locale, and other non-night-mode settings.
+        val targetConfig = android.content.res.Configuration(appCtx.resources.configuration).apply {
+            uiMode = (uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK.inv()) or targetUiMode
+        }
+
+        Log.i(TAG, "setThemeMode: $previousMode → $mode, " +
+            "activeSkin=${activeSkin?.name ?: "null"}, " +
+            "skinResourcesRefs=${skinResourcesRefs.size}, " +
+            "activeActivities=${activeActivities.size}")
+
         // Update the skin Resources configuration so that values-night/ etc.
         // are resolved correctly on the next resource lookup
         activeSkin?.resources?.let { skinRes ->
-            val config = android.content.res.Configuration(skinRes.configuration).apply {
-                uiMode = (uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK.inv()) or targetUiMode
-            }
-            skinRes.updateConfiguration(config, skinRes.displayMetrics)
+            @Suppress("DEPRECATION")
+            skinRes.updateConfiguration(targetConfig, skinRes.displayMetrics)
+            Log.d(TAG, "setThemeMode: updated active skin Resources config")
         }
 
-        // Also update the host app's base Resources configuration
-        // so that default (non-skinned) Views pick up the theme change
-        val appConfig = android.content.res.Configuration(appCtx.resources.configuration).apply {
-            uiMode = (uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK.inv()) or targetUiMode
+        // Purge GC'd SkinResources references before iterating
+        skinResourcesRefs.removeAll { it.get() == null }
+
+        // Update every SkinResources' themedResources via createConfigurationContext.
+        // This is the critical path: all View-level resource lookups go through
+        // SkinResources → themedResources. Using createConfigurationContext ensures
+        // night-qualified resources (values-night/) are resolved without relying on
+        // the deprecated Resources.updateConfiguration() API.
+        for (ref in skinResourcesRefs) {
+            ref.get()?.updateBaseConfiguration(targetConfig)
         }
-        appCtx.resources.updateConfiguration(appConfig, appCtx.resources.displayMetrics)
+        Log.i(TAG, "setThemeMode: updated ${skinResourcesRefs.size} SkinResources instances")
 
         // Walk all View trees so that all Views reflect the new theme
         walkAllActivityTrees()
 
-        // Notify listeners that the effective skin/theme has changed
+        // Notify listeners that the effective theme has changed
         notifySkinChangeListeners(activeSkin, activeSkin)
     }
 
@@ -472,14 +497,19 @@ object ArsSkinEngine {
 
         val skinRes = SkinResources(
             baseResources = base.resources,
+            themedResources = base.resources,
             skinResources = activeSkin?.resources,
             skinPackageName = activeSkin?.packageName,
             hostPackageName = base.packageName,
+            hostContext = base,
             idCacheResolver = ::cachedResolveSkinId
         )
 
         // Track this SkinResources instance so it can be updated on skin switch
         skinResourcesRefs.add(WeakReference(skinRes))
+
+        Log.d(TAG, "wrapContext: created SkinResources for ${base.packageName}, " +
+            "total tracked=${skinResourcesRefs.size}")
 
         return SkinContextWrapper(base, skinRes)
     }
@@ -666,12 +696,15 @@ object ArsSkinEngine {
     private fun walkAllActivityTrees() {
         // Purge GC'd references
         activeActivities.removeAll { it.get() == null }
+        val aliveCount = activeActivities.size
+        Log.d(TAG, "walkAllActivityTrees: walking $aliveCount active activities")
         activeActivities.forEach { ref ->
             ref.get()?.let { activity ->
                 try {
                     ArsViewTreeWalker.walk(activity.window?.decorView ?: return@let, this)
                 } catch (_: Exception) {
                     // Activity may have been destroyed between registration and walk
+                    Log.d(TAG, "walkAllActivityTrees: failed to walk ${activity.javaClass.simpleName}")
                 }
             }
         }
@@ -828,6 +861,9 @@ object ArsSkinEngine {
                 }
             } catch (e: Exception) {
                 // Graceful degradation: keep old value, log in debug
+                Log.w(TAG, "applySkinToView failed for " +
+                    "${view.javaClass.simpleName}.${binding.attributeName}=" +
+                    "0x${Integer.toHexString(binding.resId)}: ${e.message}", e)
             }
         }
     }

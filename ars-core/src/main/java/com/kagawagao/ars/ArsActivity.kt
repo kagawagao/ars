@@ -3,6 +3,7 @@ package com.kagawagao.ars
 import android.content.Context
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import androidx.annotation.CallSuper
 import androidx.annotation.RequiresApi
@@ -40,6 +41,10 @@ import com.kagawagao.ars.internal.ArsViewTreeWalker
  */
 @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
 open class ArsActivity : AppCompatActivity(), SkinChangeListener {
+
+    companion object {
+        private const val TAG = "ARS_Activity"
+    }
 
     // ─── Context Wrapping ─────────────────────────────────────────────
 
@@ -82,6 +87,10 @@ open class ArsActivity : AppCompatActivity(), SkinChangeListener {
 
         // Register for automatic View-tree walking during skin switches
         ArsSkinEngine.registerActiveActivity(this)
+
+        Log.d(TAG, "onCreate: ${this.javaClass.simpleName}, " +
+            "theme=${ArsSkinEngine.currentThemeMode}, " +
+            "skin=${ArsSkinEngine.activeSkin?.name ?: "default"}")
     }
 
     @CallSuper
@@ -89,6 +98,7 @@ open class ArsActivity : AppCompatActivity(), SkinChangeListener {
         super.onDestroy()
         ArsSkinEngine.unregisterSkinChangeListener(this)
         ArsSkinEngine.unregisterActiveActivity(this)
+        Log.d(TAG, "onDestroy: ${this.javaClass.simpleName}")
     }
 
     // ─── State Preservation (FR-P0-04) ────────────────────────────────
