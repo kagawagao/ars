@@ -19,7 +19,7 @@ class DemoRecyclerAdapter(private val itemCount: Int) :
     RecyclerView.Adapter<DemoRecyclerAdapter.VH>() {
 
     class VH(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        val title: TextView = itemView.findViewById(android.R.id.text1)
+        val title: TextView = itemView.findViewById(R.id.tvItemTitle)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
