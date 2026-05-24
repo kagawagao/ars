@@ -196,8 +196,23 @@ object ArsSkinEngine {
         if (initialized) return
         appContext = application
         skinLoader = ArsSkinLoader(application)
+
+        // Detect the current system UI mode so that the engine's theme
+        // state matches what the user actually sees on screen.
+        // This is critical when using Theme.MaterialComponents.DayNight
+        // which auto-follows the system dark mode setting — if we always
+        // default to LIGHT, the toggle button shows "switch to dark" while
+        // the UI is already in dark mode.
+        val nightMode = application.resources.configuration.uiMode and
+            android.content.res.Configuration.UI_MODE_NIGHT_MASK
+        currentThemeMode = when (nightMode) {
+            android.content.res.Configuration.UI_MODE_NIGHT_YES -> SkinPackage.ThemeMode.DARK
+            else -> SkinPackage.ThemeMode.LIGHT
+        }
+
         initialized = true
-        Log.i(TAG, "ArsSkinEngine initialized: pkg=${application.packageName}")
+        Log.i(TAG, "ArsSkinEngine initialized: pkg=${application.packageName}, " +
+            "detectedTheme=${currentThemeMode}")
     }
 
     // ─── Skin Control ─────────────────────────────────────────────────
